@@ -1,7 +1,8 @@
 # agent-kernel 进度文档
 
 > 一份持续维护的进度快照。设计纲要见 `program.md`，设计理由见 `docs/`，使用方式见 `README.md`。
-> 最后更新：**2026-09-03**（Phase 6 收官，Process 域传输升级为 gRPC）。
+> 最后更新：**2026-09-03**（Phase 6 收官；WASM e2e 补验通过；已发布 GitHub）。
+> 仓库：**https://github.com/zh2673-git/agent-kernel**
 
 ---
 
@@ -137,7 +138,7 @@ cargo test -p agent-kernel-process     # 触发 python/node/rust gRPC e2e
 
 ## 8. 未完成 / 后续路线
 
-1. **发布为外部依赖**（git / crates.io）：下游项目仅依赖、不改动内核源码（结构已在 README「下游项目如何引用本内核」一节设计好，尚未真正发布版本）。
+1. **发布为外部依赖**：✅ 已发布 GitHub（2026-09-03），下游可以 git 依赖引用（`agent-kernel-sdk = { git = "https://github.com/zh2673-git/agent-kernel" }`）；⏸ 剩余：crates.io 发布（可选）+ 用第一个真实外部插件项目验证「仅依赖、不改内核源码」路径。
 2. **充实示例插件**：LLM 适配器、agent 主循环、记忆、工具注册（当前仅有 `skeleton-llm` / `skeleton-tools` 骨架）。
 3. **（可选）流式 RPC**：若需 LLM token 流等真流式，于 `kernel.proto` 新增 `OnEventStream` 双向流 RPC（已留注释位）。
 
