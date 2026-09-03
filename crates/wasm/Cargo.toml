@@ -1,0 +1,23 @@
+[package]
+name = "agent-kernel-wasm"
+description = "WASM 执行域 host 侧：wasmtime 组件模型装载 schema/kernel.wit 组件，提供 WasmPlugin 代理（A3 强制 Serial / B3 三重时间上限）。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+agent-kernel-core.workspace = true
+agent-kernel-sdk.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+# 版本对齐：wasmtime / wasmtime-wasi / wit-bindgen(guest) 必须使用同一代 WASI 0.2.x 布局，
+# 否则链接器按 semver 容忍匹配但 ABI 不一致，运行时内存破坏（曾导致 STATUS_STACK_BUFFER_OVERRUN）。
+wasmtime = { version = "48", features = ["component-model", "cranelift"] }
+wasmtime-wasi = "48"
+
+[dev-dependencies]
+agent-kernel-kernel = { path = "../kernel", features = ["wasm"] }
+tokio = { version = "1", features = ["full", "test-util", "macros"] }

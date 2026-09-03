@@ -1,0 +1,13 @@
+[package]
+name = "agent-kernel-core"
+description = "agent-kernel 数据规范层（core）：跨 ABI 的共享类型与错误码。纯类型，零业务依赖。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true

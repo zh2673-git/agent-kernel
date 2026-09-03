@@ -1,0 +1,49 @@
+package agent-kernel:plugin@0.1.0;
+
+interface types {
+    record envelope {
+        trace-id: string,
+        span-id:  string,
+        ty:       string,
+        payload:  list<u8>,
+        priority: u8,
+        deadline-ms: option<u64>,
+    }
+    record plugin-meta {
+        id: string,
+        version: string,
+        api-version: string,
+    }
+    variant kernel-error {
+        contract-mismatch(string),
+        capability-denied(string),
+        timeout(string),
+        trap(string),
+        plugin-failed(string),
+    }
+}
+
+interface host-api {                      // 内核 → 插件（宿主能力）
+    use types.{envelope, kernel-error};
+    publish: func(ev: envelope) -> result<string, kernel-error>;
+    check-capability: func(cap: string) -> result<_, kernel-error>;
+    trace-id: func() -> string;
+}
+
+interface plugin {                        // 插件 → 内核（必须导出）
+    use types.{envelope, plugin-meta, kernel-error};
+    meta: func() -> plugin-meta;
+    init: func(cfg-json: string) -> result<_, kernel-error>;
+    start: func() -> result<_, kernel-error>;
+    on-event: func(ev: envelope) -> result<option<envelope>, kernel-error>;
+    snapshot: func() -> result<list<u8>, kernel-error>;
+    restore: func(payload: list<u8>) -> result<_, kernel-error>;
+    drain: func(timeout-ms: u64) -> result<_, kernel-error>;
+    stop: func() -> result<_, kernel-error>;
+    destroy: func() -> result<_, kernel-error>;
+}
+
+world agent-plugin {
+    import host-api;
+    export plugin;
+}

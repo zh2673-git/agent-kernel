@@ -1,0 +1,21 @@
+[package]
+name = "agent-kernel-sdk"
+description = "agent-kernel 插件 SDK（L3 语言绑定）：插件唯一可见依赖。提供 Plugin trait、HostApi、PluginContext、Migratable。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+agent-kernel-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+agent-kernel-kernel = { path = "../kernel" }
+tokio = { version = "1", features = ["full", "macros"] }

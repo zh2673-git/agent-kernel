@@ -1,0 +1,21 @@
+[package]
+name = "agent-kernel-demo"
+description = "agent-kernel 演示：跑通 注册 → 分发 → 跨插件调用 → 不停机热替换 闭环。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "demo"
+path = "src/main.rs"
+
+[dependencies]
+agent-kernel-kernel.workspace = true
+agent-kernel-sdk.workspace = true
+agent-kernel-skeleton-llm = { path = "../plugins/skeleton-llm" }
+agent-kernel-skeleton-tools = { path = "../plugins/skeleton-tools" }
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true

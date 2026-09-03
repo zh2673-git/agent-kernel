@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agent-kernel/schema/capability.schema.json",
+  "title": "CapabilitySet",
+  "description": "L1 语义契约：能力声明。deny-by-default——未声明的外部空间一律禁止。",
+  "type": "object",
+  "properties": {
+    "net_outbound": { "type": "array", "items": { "type": "string" } },
+    "fs_read": { "type": "array", "items": { "type": "string" } },
+    "fs_write": { "type": "array", "items": { "type": "string" } },
+    "env_read": { "type": "array", "items": { "type": "string" } },
+    "bus_publish": { "type": "array", "items": { "type": "string" } },
+    "bus_subscribe": { "type": "array", "items": { "type": "string" } },
+    "kernel_spawn": { "type": "boolean" },
+    "kernel_shutdown": { "type": "boolean" },
+    "clock": { "type": "boolean" },
+    "random": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

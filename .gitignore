@@ -1,0 +1,13 @@
+# Rust 构建产物
+crates/target/
+target/
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+
+# 诊断 / 临时日志
+*.log

@@ -1,0 +1,31 @@
+[package]
+name = "agent-kernel-process"
+description = "Process 执行域：guest 侧 gRPC server + 内核侧 ProcessPlugin 代理。传输 = gRPC（tonic），stub 由 schema/kernel.proto 生成。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+agent-kernel-core.workspace = true
+agent-kernel-sdk.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+tokio-stream = { version = "0.1", features = ["net"] }
+tonic = "0.14.5"
+prost = "0.14.1"
+tonic-prost = "0.14.5"
+
+[dev-dependencies]
+# e2e：内核以 process feature 装载本 crate 的 ProcessPlugin（dev 依赖允许与 kernel 的可选依赖成环）
+agent-kernel-kernel = { path = "../kernel", features = ["process"] }
+tokio = { version = "1", features = ["full", "test-util", "macros"] }
+
+[[bin]]
+name = "process-guest"
+path = "src/bin/process_guest.rs"
+
+[build-dependencies]
+tonic-prost-build = "0.14.5"

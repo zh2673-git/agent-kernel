@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agent-kernel/schema/plugin-manifest.schema.json",
+  "title": "PluginManifest",
+  "description": "L1 语义契约：插件清单。deny-by-default。",
+  "type": "object",
+  "required": ["id", "api_version", "domain"],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "api_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "domain": { "type": "string", "enum": ["in-process", "wasm", "process"] },
+    "entry": { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } } },
+    "capabilities": { "$ref": "capability.schema.json" },
+    "depends_on": { "type": "object", "additionalProperties": { "type": "object", "properties": { "version": { "type": "string" }, "kind": { "type": "string", "enum": ["hard", "soft"] } }, "required": ["version"] } },
+    "time": { "type": "object", "properties": { "semantics": { "type": "string", "enum": ["serial", "concurrent"] }, "max_inflight": { "type": "integer", "minimum": 1 }, "deadline": { "type": "string" } } },
+    "migration": { "type": "object", "properties": { "migratable": { "type": "boolean", "default": false }, "format": { "type": "string" } } }
+  },
+  "additionalProperties": true
+}

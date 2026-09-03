@@ -1,0 +1,37 @@
+[package]
+name = "agent-kernel-kernel"
+description = "agent-kernel 内核单体：生命周期/调度/注册表/多执行域/热替换。内部按 interfaces/application/domain/infrastructure/runtime 分层（C1）。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+agent-kernel-core.workspace = true
+agent-kernel-sdk.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+arc-swap.workspace = true
+petgraph.workspace = true
+toml.workspace = true
+uuid.workspace = true
+futures = "0.3"
+agent-kernel-process = { workspace = true, optional = true }
+agent-kernel-wasm = { workspace = true, optional = true }
+
+[features]
+default = []
+wasm = ["dep:agent-kernel-wasm"]
+process = ["dep:agent-kernel-process"]
+
+# 注意：内核本体不直接依赖 wasmtime（经 agent-kernel-wasm 间接使用 48）；
+# 已删除旧的 optional wasmtime=21，避免 21/48 双版本并存。
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util", "macros"] }

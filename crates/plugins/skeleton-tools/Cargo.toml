@@ -1,0 +1,11 @@
+[package]
+name = "agent-kernel-skeleton-tools"
+description = "骨架插件：工具注册（仅依赖 sdk，演示跨插件调用走 HostApi）。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+agent-kernel-sdk.workspace = true
+serde_json.workspace = true
+async-trait.workspace = true

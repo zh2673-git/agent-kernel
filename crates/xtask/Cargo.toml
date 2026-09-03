@@ -1,0 +1,12 @@
+[package]
+name = "agent-kernel-xtask"
+description = "agent-kernel 实施纪律强制工具：layering（C1）/ check-abi 字段级（C3）/ deps（插件仅依赖 sdk）。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "xtask"
+path = "src/main.rs"
+
+[dependencies]

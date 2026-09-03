@@ -1,0 +1,55 @@
+syntax = "proto3";
+package agentkernel.v1;
+
+service PluginService {
+  rpc Meta(Empty)                 returns (PluginMeta);
+  rpc Handshake(HandshakeReq)     returns (HandshakeResp);   // ApiVersion 协商
+  rpc Init(InitReq)               returns (InitResp);
+  rpc Start(Empty)                returns (Empty);
+  // M1 语义为一请求一响应（请求/回复经 idempotency_key 关联）。
+  // 说明：原设计为双向流，但跨运行时（tonic ↔ grpc-python / grpc-js）的
+  // 流式互操作在实测中不可靠（DATA 帧未送达）。需要真正的流式语义
+  // （如 LLM token 流）时，再新增 OnEventStream 双向流 RPC。
+  rpc OnEvent(Envelope)           returns (Envelope);
+  rpc Snapshot(Empty)             returns (SnapshotResp);
+  rpc Restore(SnapshotReq)        returns (Empty);
+  rpc Drain(DrainReq)             returns (DrainResp);
+  rpc Stop(Empty)                returns (Empty);
+  rpc Destroy(Empty)             returns (Empty);
+  rpc Health(Empty)              returns (HealthResp);
+}
+
+message Empty {}
+
+message Envelope {
+  string trace_id = 1;
+  string span_id  = 2;
+  string ty       = 3;
+  bytes  payload  = 4;
+  uint32 priority = 5;
+  optional uint64 deadline_ms = 6;
+  string idempotency_key = 7;
+}
+
+message PluginMeta { string id = 1; string version = 2; string api_version = 3; }
+
+message HandshakeReq { string api_version = 1; repeated string capabilities = 2; }
+message HandshakeResp { bool compatible = 1; string reason = 2; }
+
+message InitReq { string config_json = 1; }
+message InitResp {}
+
+message SnapshotResp { bytes payload = 1; }
+message SnapshotReq { bytes payload = 1; }
+message DrainReq { uint64 timeout_ms = 1; }
+message DrainResp {}
+message HealthResp { bool ok = 1; string detail = 2; }
+
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  K201_CONTRACT_MISMATCH = 201;
+  K301_CAPABILITY_DENIED = 301;
+  K401_DRAIN_TIMEOUT     = 401;
+  K501_PLUGIN_PANIC      = 501;
+  K503_DOMAIN_DISCONNECT = 503;
+}

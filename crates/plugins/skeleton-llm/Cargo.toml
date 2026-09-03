@@ -1,0 +1,11 @@
+[package]
+name = "agent-kernel-skeleton-llm"
+description = "骨架插件：LLM 适配器（仅依赖 sdk，演示 in-process 串行语义 + 热替换）。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+agent-kernel-sdk.workspace = true
+serde_json.workspace = true
+async-trait.workspace = true

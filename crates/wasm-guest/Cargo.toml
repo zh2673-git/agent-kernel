@@ -1,0 +1,17 @@
+[package]
+name = "agent-kernel-wasm-guest"
+description = "WASM guest 示例：用 wit-bindgen 导出 schema/kernel.wit 的 plugin 接口，编译为 wasm32-wasip2 组件供内核装载。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+serde_json.workspace = true
+wit-bindgen = "0.61"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "macros"] }
