@@ -1,7 +1,7 @@
 # agent-kernel 进度文档
 
 > 一份持续维护的进度快照。设计纲要见 `program.md`（同目录），设计理由见 `docs/00~07`，使用方式见 `../README.md`。
-> 最后更新：**2026-09-03**（Phase 6 收官；WASM e2e 补验通过；已发布 GitHub）。
+> 最后更新：**2026-09-03**（v0.1.1：修复 Process 域 destroy kill 竞态；下游项目 react-agent 已验证外部依赖路径）。
 > 仓库：**https://github.com/zh2673-git/agent-kernel**
 
 ---
@@ -52,6 +52,7 @@
 | 阶段四 | **纯 Rust、无外部依赖**重构（内核与进程/宿主侧零第三方运行时依赖） | ✅ 完成 |
 | 阶段五 | **跨语言 L3 绑定**（Python / TS，与 Rust guest 同一线协议 + echo 示例） | ✅ 完成（原 NDJSON/stdio 协议，见阶段六升级） |
 | 阶段六 | **Process 域传输升级为 gRPC**（tonic + protobuf，Rust/Python/TS 三端统一） | ✅ 完成 |
+| 阶段六·1（v0.1.1） | **修复 Process 域 destroy kill 竞态**：`ProcessPlugin::destroy` 改为同步 `start_kill`（kill 不再依赖宿主运行时存活），Destroy RPC 降级为 kill 后 best-effort。由下游项目 react-agent e2e 实测发现（泄漏 guest 残留 → 扣住 cargo 管道） | ✅ 完成（e2e 后零残留进程） |
 
 ### 阶段六交付细节（本次收尾）
 - **Rust 侧**：`build.rs` 用 `tonic-prost-build` 编译 `schema/kernel.proto` 生成 stub；`ProcessPlugin` 改为 gRPC 客户端，`guest` 改为 gRPC server（启动打印 `PORT=<n>` 由内核连接 127.0.0.1）。

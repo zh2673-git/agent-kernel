@@ -166,24 +166,20 @@ impl Plugin for ProcessPlugin {
         self.call_on_event(env).await
     }
     fn destroy(&self) -> KernelResult<()> {
-        // 幂等通知：best-effort 调 Destroy RPC，随后强制 kill（真正释放在进程退出）。
-        let client = Arc::clone(&self.client);
-        let child = self.child.clone();
-        match tokio::runtime::Handle::try_current() {
-            Ok(h) => {
-                h.spawn(async move {
-                    if let Ok(mut c) = client.try_lock() {
-                        let _ = c
-                            .destroy(tonic::Request::new(crate::pb::v1::Empty {}))
-                            .await;
-                    }
-                    tokio::time::sleep(Duration::from_millis(300)).await;
-                    let _ = child.lock().unwrap().start_kill();
-                });
-            }
-            Err(_) => {
-                let _ = child.lock().unwrap().start_kill();
-            }
+        // 1) 同步强杀：start_kill 立即发出终止信号，不依赖宿主运行时存活。
+        //    （修复：此前 kill 走 fire-and-forget 任务，宿主在 destroy 后立刻关闭
+        //    运行时会导致 kill 任务未执行 → guest 进程残留。）
+        let _ = self.child.lock().unwrap().start_kill();
+        // 2) 幂等 best-effort Destroy RPC：进程多半已被 kill，失败静默。
+        if let Ok(h) = tokio::runtime::Handle::try_current() {
+            let client = Arc::clone(&self.client);
+            h.spawn(async move {
+                if let Ok(mut c) = client.try_lock() {
+                    let _ = c
+                        .destroy(tonic::Request::new(crate::pb::v1::Empty {}))
+                        .await;
+                }
+            });
         }
         Ok(())
     }
