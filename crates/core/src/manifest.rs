@@ -61,7 +61,7 @@ pub struct Manifest {
     /// epoch tick 间隔毫秒（B3）。
     #[serde(default)]
     pub epoch_interval_ms: Option<u64>,
-    /// 订阅的事件类型（事件循环据此路由，program.md 时间契约）。
+    /// 订阅的事件类型（事件循环据此路由，docs/program.md 时间契约）。
     #[serde(default)]
     pub subscriptions: Vec<String>,
 }

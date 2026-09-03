@@ -1,6 +1,6 @@
 # agent-kernel 进度文档
 
-> 一份持续维护的进度快照。设计纲要见 `program.md`，设计理由见 `docs/`，使用方式见 `README.md`。
+> 一份持续维护的进度快照。设计纲要见 `program.md`（同目录），设计理由见 `docs/00~07`，使用方式见 `../README.md`。
 > 最后更新：**2026-09-03**（Phase 6 收官；WASM e2e 补验通过；已发布 GitHub）。
 > 仓库：**https://github.com/zh2673-git/agent-kernel**
 
@@ -105,9 +105,8 @@ agent-kernel/
 │  ├─ python/      agent_kernel（grpcio + 生成 _proto/）+ examples ✅
 │  └─ typescript/  src/index.ts（@grpc/grpc-js）+ examples       ✅
 ├─ schema/         L2：kernel.wit / kernel.proto；L1：plugin-manifest / capability（JSON Schema） ✅
-├─ docs/           设计文档树 00~07                               ✅
-├─ program.md      设计纲要（用户确认的关键决策）                ✅
-├─ project-development-prompt.md  开发 skill 提示               ✅
+├─ docs/           设计文档树 00~07 + program.md（设计纲要）+ PROGRESS.md（本文件）✅
+├─ LICENSE-MIT / LICENSE-APACHE  双许可（MIT OR Apache-2.0）        ✅
 └─ README.md       使用与架构说明                                ✅
 ```
 
@@ -132,7 +131,7 @@ npm install                            # bindings/typescript
 cargo test -p agent-kernel-process     # 触发 python/node/rust gRPC e2e
 ```
 
-插件开发（本仓库内 / 下游外部依赖）详见 `README.md` 第 101、147 行起的两节。
+插件开发（本仓库内 / 下游外部依赖）详见 `README.md` 的「开发插件（本仓库内）」与「下游项目如何引用本内核」两节。
 
 ---
 

@@ -1,5 +1,7 @@
 # agent-kernel
 
+> GitHub：**https://github.com/zh2673-git/agent-kernel** ｜ 许可证：MIT OR Apache-2.0 ｜ 进度快照见 `docs/PROGRESS.md`
+
 一个 **agent 运行时内核**：内核只做三件事——**开辟/隔离插件的空间、编排插件的执行时间流、强制校验插件契约与权限**。所有具体能力（LLM 适配器、工具、记忆、规划/编排、提示词、向量库……）全部以**插件**形式挂载到内核，并支持**不停机热替换**。
 
 ---
@@ -32,9 +34,9 @@ agent-kernel/
 │  └─ xtask/       架构校验脚本（依赖方向守卫）
 ├─ bindings/       跨语言 L3 SDK：python（agent_kernel，grpcio + 生成的 stub）/ typescript（src/index.ts，@grpc/grpc-js + proto-loader 运行时加载 proto），与 Rust 同一 gRPC 协议 + echo 示例
 ├─ schema/         契约唯一源（L2：kernel.wit / kernel.proto；L1：plugin-manifest / capability 两个 JSON Schema）
-├─ docs/           设计文档树（00~07）
-├─ program.md      项目目标与已确认决策
-└─ project-development-prompt.md  时空运行时开发方法论（skill）
+├─ docs/           设计文档树（00~07）+ program.md（设计纲要）+ PROGRESS.md（进度快照）
+├─ LICENSE-MIT / LICENSE-APACHE  双许可（MIT OR Apache-2.0）
+└─ README.md       本文件
 ```
 
 **依赖方向铁律**：`interfaces → application → domain ← infrastructure → core`；插件只允许依赖 `sdk`（编译期硬禁依赖 `kernel` 内部模块）。这是**防规则穿透**的物理手段——插件永远碰不到内核内部。
@@ -51,7 +53,7 @@ agent-kernel/
 |---|---|---|---|
 | L1 | 语义契约 | 文档 + JSON Schema | 身份/能力/事件模型/生命周期/状态/错误/时间语义 |
 | L2 | 线协议 ABI | `kernel.wit` / `kernel.proto` | **真正的插件接口**（跨语言、跨动态库） |
-| L3 | 语言绑定 | Rust trait | L2 的一种方言（本项目当前用此跑通进程内域） |
+| L3 | 语言绑定 | Rust trait / Python / TS | L2 的方言（Rust 跑进程内域；Python/TS 经 gRPC 跑进程域，各自带 echo 示例） |
 
 > 关键：Rust 无稳定 ABI，`Box<dyn Plugin>` 跨动态库边界有 UB 风险，故 `trait Plugin` 降级为 L3 绑定，L2 才是唯一契约源。
 
@@ -148,15 +150,19 @@ publish(event)
 
 本仓库发布后，一个**全新的 agent 项目应把内核当作外部依赖**，而非把内核源码搬进自己的 `crates/`。这样内核的 `crates/`（core/kernel/sdk）始终保持不动，下游只通过 `sdk` 这扇门与之交互。
 
-**依赖方式**：
+**依赖方式**（三选一）：
 
 ```toml
-# 下游项目 Cargo.toml（开发期：本地 path 指向本仓库）
+# ① GitHub git 依赖（已发布，推荐）
 [workspace.dependencies]
-agent-kernel-sdk    = { path = "../agent-kernel/crates/sdk" }
-agent-kernel-kernel = { path = "../agent-kernel/crates/kernel" }
+agent-kernel-sdk    = { git = "https://github.com/zh2673-git/agent-kernel" }
+agent-kernel-kernel = { git = "https://github.com/zh2673-git/agent-kernel" }
 
-# 内核发布后改为版本依赖：
+# ② 开发期：本地 path 指向本仓库
+# agent-kernel-sdk    = { path = "../agent-kernel/crates/sdk" }
+# agent-kernel-kernel = { path = "../agent-kernel/crates/kernel" }
+
+# ③ crates.io 版本依赖（尚未发布，后续可选）
 # agent-kernel-sdk    = "0.1"
 # agent-kernel-kernel = "0.1"
 ```
@@ -214,8 +220,9 @@ my-agent/                         ← 下游项目根（产品）
 ## 后续路线
 
 1. ✅ Process 域传输已升级为 gRPC（tonic + protobuf，详见上文；Python/TS SDK 已同步升级）。
-2. 将内核发布为外部依赖（git / crates.io），下游项目仅依赖、不改动其源码。
+2. ✅ 内核已发布 GitHub（git 依赖可引用）；待用第一个真实外部插件项目验证「仅依赖、不改内核源码」路径；crates.io 发布可选。
 3. 充实示例插件：LLM 适配器、agent 主循环、记忆、工具注册。
+4. （可选）流式 RPC：需要 LLM token 流等真流式时，于 `kernel.proto` 新增 `OnEventStream` 双向流 RPC（已留注释位）。
 
 ---
 

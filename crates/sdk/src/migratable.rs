@@ -1,7 +1,7 @@
 use crate::KernelError;
 use async_trait::async_trait;
 
-/// 热迁移协议（状态可丢弃 or 可快照迁移，program.md 空间契约）。
+/// 热迁移协议（状态可丢弃 or 可快照迁移，docs/program.md 空间契约）。
 ///
 /// **C2（强制）**：默认 `is_migratable() == false`，`snapshot`/`restore` 默认返回
 /// 类型化 `Err(K600)`。**严禁** `unimplemented!()` / `todo!()` / `panic!()` ——
