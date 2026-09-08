@@ -1,8 +1,8 @@
 //! host 侧：`ProcessPlugin` —— 实现 `trait Plugin` 的进程插件代理（gRPC）。
 //!
 //! 流程：spawn 子进程 → 读 stdout 首行 `PORT=<n>` → gRPC 连接 `127.0.0.1:<n>`
-//! → `Handshake` 协商 ApiVersion → 之后 `on_event` 经 `OnEvent` 双向流往返
-//! （`idempotency_key` 承载 seq，支持并发语义下的乱序回复关联）。
+//! → `Handshake` 协商 ApiVersion → 之后 `on_event` 经 `OnEvent` 一请求一响应
+//! （unary）往返（`idempotency_key` 承载 seq，支持并发语义下的乱序回复关联）。
 //! deadline 超时 → K502；连接断开 → 在途请求收敛 K700。
 
 use crate::pb::v1::{
@@ -102,15 +102,16 @@ impl ProcessPlugin {
         let seq = self.next_seq.fetch_add(1, Ordering::Relaxed);
         let req = to_proto(&env, seq)?;
 
-        // 一请求一响应（unary）。锁在调用发起后立即释放，不阻塞其他调用。
-        let reply = {
-            let mut client = self.client.lock().await;
-            client
-                .on_event(req)
-                .await
-                .map_err(|e| KernelError::DomainUnavailable(format!("on_event rpc failed: {e}")))?
-                .into_inner()
-        };
+        // 一请求一响应（unary）。Concurrent 语义下允许并发在途 RPC：锁内仅克隆
+        // client（tonic 克隆共享同一 Channel，开销极低），RPC 在锁外 await——
+        // 在途请求不阻塞后续调用。串行化由 ProcessDomain 的插件级锁按
+        // manifest.semantics 保证，不在此重复。
+        let mut client = self.client.lock().await.clone();
+        let reply = client
+            .on_event(req)
+            .await
+            .map_err(|e| KernelError::DomainUnavailable(format!("on_event rpc failed: {e}")))?
+            .into_inner();
         Ok(payload_to_value(&reply.payload))
     }
 }
