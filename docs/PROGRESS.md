@@ -1,7 +1,7 @@
 # agent-kernel 进度文档
 
 > 一份持续维护的进度快照。设计纲要见 `program.md`（同目录），设计理由见 `docs/00~07`，使用方式见 `../README.md`。
-> 最后更新：**2026-09-03**（v0.1.1：修复 Process 域 destroy kill 竞态；下游项目 react-agent 已验证外部依赖路径）。
+> 最后更新：**2026-09-08**（v0.1.2：修复 Process 域 Concurrent 语义失效——`ProcessPlugin` 整段 RPC 持 client 锁把并发在途无声串行化；改为锁内克隆、锁外 await）。
 > 仓库：**https://github.com/zh2673-git/agent-kernel**
 
 ---
@@ -53,6 +53,7 @@
 | 阶段五 | **跨语言 L3 绑定**（Python / TS，与 Rust guest 同一线协议 + echo 示例） | ✅ 完成（原 NDJSON/stdio 协议，见阶段六升级） |
 | 阶段六 | **Process 域传输升级为 gRPC**（tonic + protobuf，Rust/Python/TS 三端统一） | ✅ 完成 |
 | 阶段六·1（v0.1.1） | **修复 Process 域 destroy kill 竞态**：`ProcessPlugin::destroy` 改为同步 `start_kill`（kill 不再依赖宿主运行时存活），Destroy RPC 降级为 kill 后 best-effort。由下游项目 react-agent e2e 实测发现（泄漏 guest 残留 → 扣住 cargo 管道） | ✅ 完成（e2e 后零残留进程） |
+| 阶段六·2（v0.1.2） | **修复 Process 域 Concurrent 语义失效**：`ProcessPlugin::call_on_event` 整段 unary RPC 持 client 锁，使声明 `Concurrent` 的插件被无声串行化（域层按 `semantics` 判定无误，问题只在 host 代理）。改为锁内克隆 client（tonic 克隆共享同一 Channel）、RPC 锁外 await；串行化仍由 `ProcessDomain` 插件级锁保证。新增 `tests/concurrent_semantics.rs`（4×300ms 并发实测 0.34s，修复前 ≥1.2s）。由 react-agent K502 雪崩归因发现（卡死在途 RPC 长期占锁 → 同插件请求连锁排队） | ✅ 完成（workspace 测试全绿） |
 
 ### 阶段六交付细节（本次收尾）
 - **Rust 侧**：`build.rs` 用 `tonic-prost-build` 编译 `schema/kernel.proto` 生成 stub；`ProcessPlugin` 改为 gRPC 客户端，`guest` 改为 gRPC server（启动打印 `PORT=<n>` 由内核连接 127.0.0.1）。
