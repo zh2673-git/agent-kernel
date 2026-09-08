@@ -13,7 +13,7 @@ dependencies = [
 
 [[package]]
 name = "agent-kernel-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -23,7 +23,7 @@ dependencies = [
 
 [[package]]
 name = "agent-kernel-demo"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "agent-kernel-kernel",
  "agent-kernel-sdk",
@@ -38,7 +38,7 @@ dependencies = [
 
 [[package]]
 name = "agent-kernel-echo-dylib"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "agent-kernel-sdk",
  "async-trait",
@@ -47,7 +47,7 @@ dependencies = [
 
 [[package]]
 name = "agent-kernel-kernel"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "agent-kernel-core",
  "agent-kernel-process",
@@ -70,7 +70,7 @@ dependencies = [
 
 [[package]]
 name = "agent-kernel-process"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "agent-kernel-core",
  "agent-kernel-kernel",
@@ -88,7 +88,7 @@ dependencies = [
 
 [[package]]
 name = "agent-kernel-sdk"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "agent-kernel-core",
  "agent-kernel-kernel",
@@ -103,7 +103,7 @@ dependencies = [
 
 [[package]]
 name = "agent-kernel-skeleton-llm"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "agent-kernel-sdk",
  "async-trait",
@@ -112,7 +112,7 @@ dependencies = [
 
 [[package]]
 name = "agent-kernel-skeleton-tools"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "agent-kernel-sdk",
  "async-trait",
@@ -121,7 +121,7 @@ dependencies = [
 
 [[package]]
 name = "agent-kernel-wasm"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "agent-kernel-core",
  "agent-kernel-kernel",
@@ -136,7 +136,7 @@ dependencies = [
 
 [[package]]
 name = "agent-kernel-wasm-guest"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde_json",
  "tokio",
@@ -145,7 +145,7 @@ dependencies = [
 
 [[package]]
 name = "agent-kernel-xtask"
-version = "0.1.1"
+version = "0.1.2"
 
 [[package]]
 name = "aho-corasick"
