@@ -31,6 +31,20 @@ impl HostApi for KernelHost {
         dispatch::dispatch(self.inner.clone(), env).await
     }
 
+    async fn call_capability(
+        &self,
+        capability: &str,
+        payload: Value,
+        deadline: std::time::Duration,
+    ) -> Result<Value, KernelError> {
+        // K2（v0.1.4）：动态解析 → 复用 dispatch 全链（B5/B2/B4/deadline 全部继承）。
+        // 解析每次查当前索引 → 与 hot_swap 兼容（换实现后新调用流向新实例）。
+        let target = self.inner.cap_provider(capability)?;
+        let mut env = Envelope::new(target, payload);
+        env.deadline = Some(deadline);
+        dispatch::dispatch(self.inner.clone(), env).await
+    }
+
     fn now_mono(&self) -> u64 {
         let start = START.get_or_init(Instant::now);
         start.elapsed().as_nanos() as u64

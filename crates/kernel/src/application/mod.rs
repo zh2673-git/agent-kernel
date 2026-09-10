@@ -6,6 +6,7 @@ use crate::interfaces::domains::domain_for;
 use crate::runtime::KernelInner;
 use agent_kernel_core::{Generation, KernelError, Manifest, PluginId, PluginState};
 use agent_kernel_sdk::{KernelContext, PluginConfig, PluginContext, PluginInstance};
+use std::sync::Arc;
 
 impl KernelInner {
     /// 注册一个插件实例：校验 → 依赖解析 → 建域 → init → 注册 → Running。
@@ -33,6 +34,8 @@ impl KernelInner {
             .collect();
         manifests.push(manifest.clone());
         let graph = crate::domain::dependency::resolve(&manifests)?;
+        // K2（v0.1.4）：同步刷新 capability → 提供者索引（与依赖图同源，先注册者胜）
+        self.cap_index.store(Arc::new(graph.cap_index().clone()));
         *self.deps.lock().unwrap() = graph;
 
         let domain = domain_for(&manifest, self.scheduler.clone())?;
@@ -74,6 +77,15 @@ impl KernelInner {
             let _ = slot.plugin.destroy();
         }
         self.registry.remove(id);
+        // K2（v0.1.4）：卸载后重建 capability 索引（其余提供者不受影响）
+        let remaining: Vec<Manifest> = self
+            .registry
+            .ids()
+            .iter()
+            .filter_map(|id| self.registry.slot(id).map(|s| s.manifest.clone()))
+            .collect();
+        self.cap_index
+            .store(Arc::new(crate::domain::dependency::build_cap_index(&remaining)));
         self.lifecycle
             .transition(id, PluginState::Unloaded, None)?;
         self.subscriptions

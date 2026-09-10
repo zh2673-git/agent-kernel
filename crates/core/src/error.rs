@@ -36,6 +36,9 @@ pub enum KernelError {
     /// K403：drain 期间豁免 Block，退化为 Reject（B4）。
     #[error("[K403] plugin {0} is draining; request rejected (backpressure degraded to reject)")]
     DrainingReject(PluginId),
+    /// K404：capability 无提供者（call_capability 寻址失败，K2 寻址契约）。
+    #[error("[K404] no provider registered for capability '{0}'")]
+    UnknownCapability(String),
 
     // ---- 时间/执行 ----
     /// K501：catch_unwind 捕获到 panic（B2）。
@@ -86,6 +89,7 @@ impl KernelError {
             KernelError::UnknownPlugin(_) => "K401",
             KernelError::NotRunning(..) => "K402",
             KernelError::DrainingReject(_) => "K403",
+            KernelError::UnknownCapability(_) => "K404",
             KernelError::PluginPanic(..) => "K501",
             KernelError::DeadlineExceeded(_) => "K502",
             KernelError::Cancelled(_) => "K503",

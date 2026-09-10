@@ -4,8 +4,9 @@ use crate::domain::scheduler::SchedulerRef;
 use crate::domain::{dependency, hotswap::HotSwapCoordinator, lifecycle::LifecycleManager, registry::Registry, scheduler::Scheduler};
 use crate::infrastructure::bus::EventBus;
 use crate::interfaces::{dispatch, KernelHost};
-use agent_kernel_core::PluginId;
+use agent_kernel_core::{Capability, KernelError, PluginId};
 use agent_kernel_sdk::{Envelope, GlobalConfig, PluginInstance, Priority};
+use arc_swap::ArcSwap;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -16,6 +17,8 @@ pub struct KernelInner {
     pub(crate) registry: Registry,
     pub(crate) lifecycle: LifecycleManager,
     pub(crate) deps: Mutex<dependency::DependencyGraph>,
+    /// K2（v0.1.4）：capability → 提供者索引（读侧无锁 ArcSwap；注册/卸载时全量重建）。
+    pub(crate) cap_index: Arc<ArcSwap<HashMap<Capability, PluginId>>>,
     pub(crate) scheduler: SchedulerRef,
     pub(crate) hotswap: HotSwapCoordinator,
     pub(crate) bus: EventBus,
@@ -32,6 +35,7 @@ impl KernelInner {
             registry: Registry::new(),
             lifecycle: LifecycleManager::new(bus.lifecycle_tx()),
             deps: Mutex::new(dependency::DependencyGraph::new()),
+            cap_index: Arc::new(ArcSwap::from_pointee(HashMap::new())),
             scheduler: Scheduler::new(config.max_total_inflight),
             hotswap: HotSwapCoordinator::new(),
             bus,
@@ -49,6 +53,16 @@ impl KernelInner {
 
     pub(crate) fn host(&self) -> &Arc<dyn agent_kernel_sdk::HostApi> {
         self.host.get().expect("host not initialized")
+    }
+
+    /// K2（v0.1.4）：capability → 提供者。动态解析（每次调用查当前索引）
+    /// → 与 hot_swap 兼容（换实现后新调用自动流向新实例）。
+    pub(crate) fn cap_provider(&self, capability: &str) -> Result<PluginId, KernelError> {
+        self.cap_index
+            .load()
+            .get(&Capability::new(capability))
+            .cloned()
+            .ok_or_else(|| KernelError::UnknownCapability(capability.to_string()))
     }
 }
 

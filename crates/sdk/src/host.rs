@@ -5,6 +5,7 @@
 
 use crate::{Envelope, Event, KernelResult, TraceId};
 use async_trait::async_trait;
+use std::time::Duration;
 
 #[async_trait]
 pub trait HostApi: Send + Sync {
@@ -13,6 +14,25 @@ pub trait HostApi: Send + Sync {
 
     /// 同步调用另一个插件（跨插件通信一律走内核，禁止插件间直接内存互访）。
     async fn call_plugin(&self, env: Envelope) -> KernelResult<serde_json::Value>;
+
+    /// 按 capability 调用提供者（K2 寻址契约，v0.1.4）。
+    ///
+    /// 内核解析 `capability → PluginId` 后复用 dispatch 全链（B5 快照 / B2 panic 隔离 /
+    /// B4 背压 / deadline 竞争全部继承）。解析为**每次调用动态查当前注册表**——
+    /// 与热替换兼容（换实现后新调用自动流向新实例），这是"面向能力编程"的入口：
+    /// 调用方不再硬编码提供者名字，居民因此可被同名/异名实现替换。
+    ///
+    /// 多提供者规则：**先注册者胜**（见 `dependency::build_cap_index`）。
+    /// 默认实现返回 K404——宿主未支持寻址时既有实现者零改动（向后兼容）。
+    async fn call_capability(
+        &self,
+        capability: &str,
+        payload: serde_json::Value,
+        deadline: Duration,
+    ) -> KernelResult<serde_json::Value> {
+        let _ = (capability, payload, deadline);
+        Err(crate::KernelError::UnknownCapability(capability.to_string()))
+    }
 
     /// 进程内单调时钟（纳秒）。仅用于相对计时；**不**进 `Envelope`（A2）。
     /// 口径澄清（v0.1.3，K4）：这是相对 deadline 测量的时钟源，与 `Envelope.deadline`

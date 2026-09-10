@@ -390,3 +390,139 @@ async fn k3_emit_fails_fast_without_run() {
     k.stop();
     let _ = runner.await;
 }
+
+// ---- K2（v0.1.4）：capability 寻址——命中 / 热替换跟随 / 未注册 K404 ----
+
+/// 声明指定 capability、返回自报名的最小插件（寻址测试的提供者）。
+struct NamedPlugin {
+    manifest: Manifest,
+    respond_name: &'static str,
+}
+
+impl NamedPlugin {
+    fn new(id: &'static str, capability: &'static str, respond_name: &'static str) -> PluginInstance {
+        let manifest = Manifest {
+            name: PluginId::new(id),
+            kind: PluginKind::Capability,
+            version: Version::new(0, 1, 0),
+            api_version: ApiVersion::new(1, 0),
+            capabilities: vec![Capability::new(capability)],
+            dependencies: vec![],
+            domain: Domain::InProcess,
+            semantics: Semantics::Serial,
+            priority: 1,
+            max_inflight: Some(4),
+            fuel_limit: None,
+            host_timeout_ms: None,
+            epoch_interval_ms: None,
+            subscriptions: vec![],
+        };
+        Arc::new(Self { manifest, respond_name })
+    }
+}
+
+#[async_trait]
+impl Plugin for NamedPlugin {
+    fn id(&self) -> PluginId {
+        self.manifest.name.clone()
+    }
+    fn manifest(&self) -> &Manifest {
+        &self.manifest
+    }
+    async fn init(&self, _ctx: &PluginContext) -> KernelResult<()> {
+        Ok(())
+    }
+    async fn on_event(&self, _env: Env) -> KernelResult<serde_json::Value> {
+        Ok(json!({ "name": self.respond_name }))
+    }
+    fn destroy(&self) -> KernelResult<()> {
+        Ok(())
+    }
+}
+
+/// 捕获 HostApi 并按 payload.cap 调 call_capability 的测试插件（寻址的调用方侧）。
+struct CallCapPlugin {
+    manifest: Manifest,
+    host: OnceLock<Arc<dyn HostApi>>,
+}
+
+impl CallCapPlugin {
+    fn new(name: &'static str) -> PluginInstance {
+        let manifest = Manifest {
+            name: PluginId::new(name),
+            kind: PluginKind::Capability,
+            version: Version::new(0, 1, 0),
+            api_version: ApiVersion::new(1, 0),
+            capabilities: vec![],
+            dependencies: vec![],
+            domain: Domain::InProcess,
+            semantics: Semantics::Serial,
+            priority: 1,
+            max_inflight: Some(4),
+            fuel_limit: None,
+            host_timeout_ms: None,
+            epoch_interval_ms: None,
+            subscriptions: vec![],
+        };
+        Arc::new(Self { manifest, host: OnceLock::new() })
+    }
+}
+
+#[async_trait]
+impl Plugin for CallCapPlugin {
+    fn id(&self) -> PluginId {
+        self.manifest.name.clone()
+    }
+    fn manifest(&self) -> &Manifest {
+        &self.manifest
+    }
+    async fn init(&self, ctx: &PluginContext) -> KernelResult<()> {
+        let _ = self.host.set(ctx.kernel.host.clone());
+        Ok(())
+    }
+    async fn on_event(&self, env: Env) -> KernelResult<serde_json::Value> {
+        let host = self.host.get().expect("host not initialized");
+        let cap = env.payload.get("cap").and_then(serde_json::Value::as_str).unwrap_or("svc");
+        match host.call_capability(cap, json!({}), Duration::from_millis(1000)).await {
+            Ok(v) => Ok(v),
+            Err(e) => Ok(json!({ "code": e.code() })),
+        }
+    }
+    fn destroy(&self) -> KernelResult<()> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn k2_call_capability_resolves_and_follows_hot_swap() {
+    let k = fresh_kernel().await;
+    k.register(NamedPlugin::new("svc-v1", "svc", "v1")).await;
+    k.register(CallCapPlugin::new("cc")).await;
+
+    // ① 按 capability 寻址命中提供者（调用方未硬编码插件名）
+    let r = k
+        .dispatch(Envelope::new(PluginId::new("cc"), json!({})))
+        .await
+        .unwrap();
+    assert_eq!(r["name"], json!("v1"), "call_capability 应命中 svc 提供者: {r:?}");
+
+    // ② 热替换后新调用动态流向新实例（解析每次查当前索引，非注册期固化）
+    k.hot_swap(PluginId::new("svc-v1"), NamedPlugin::new("svc-v1", "svc", "v2"))
+        .await;
+    let r2 = k
+        .dispatch(Envelope::new(PluginId::new("cc"), json!({})))
+        .await
+        .unwrap();
+    assert_eq!(r2["name"], json!("v2"), "热替换后 call_capability 应流向新实例: {r2:?}");
+}
+
+#[tokio::test]
+async fn k2_unknown_capability_is_k404() {
+    let k = fresh_kernel().await;
+    k.register(CallCapPlugin::new("cc")).await;
+    let r = k
+        .dispatch(Envelope::new(PluginId::new("cc"), json!({ "cap": "nope" })))
+        .await
+        .unwrap();
+    assert_eq!(r["code"], json!("K404"), "未注册 capability 应返回 K404: {r:?}");
+}
