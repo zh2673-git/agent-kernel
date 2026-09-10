@@ -176,5 +176,31 @@
   ③ react-agent 侧存量瑕疵 `crates/host/src/config.rs:426`（test 内 unused `n`，与本轮无关，待居民侧清理）；
   ④ react-agent 的 `[patch]` 已恢复注释（tag 未打前 tag 依赖不受影响）。
 
-### P1（内核 v0.1.4）/ P2（conformance v0.1.0）/ P3（无内核发布）
-（待实施；每轮按「目标 → 方案 → P/Q/I 验证 → 保留或回退」追加记录）
+### P1（内核 v0.1.4）：capability 寻址 ✅（2026-09-10，决策：保留）
+
+- **目标**：闭合寻址契约（谱系同源 ②）——调用方摆脱插件名硬编码，"可替换"在内核层成立。
+- **方案**：
+  - `HostApi::call_capability(capability, payload, deadline)` **带默认实现返回 K404**（新增 `UnknownCapability`，寻址失败显式化）→ 既有实现者零改动；
+  - `dependency::build_cap_index`（从 `resolve` 内联逻辑提为公共函数，**先注册者胜**）+ `DependencyGraph` 持有索引；
+  - `KernelInner.cap_index: Arc<ArcSwap<...>>`（读侧无锁，纪律 3）：注册时与依赖图同源刷新、卸载时全量重建；
+  - `KernelHost::call_capability`：动态解析 → 复用 dispatch 全链（B5/B2/B4/deadline 全部继承）。
+- **验证（P ✅ / Q ✅ / I ✅）**：新增 `k2_call_capability_resolves_and_follows_hot_swap`（寻址命中 + 热替换后新调用流向新实例——动态解析契约）与 `k2_unknown_capability_is_k404`；内核 invariants 10/10；react-agent 升 tag v0.1.4 全量 16 组测试零失败（居民未采纳新 API 亦零回归，向后兼容实证）。
+- **决策**：保留。居民侧采纳渐进（react-agent 暂未切换 call_capability，见其仓后续迭代）。
+
+### P2（conformance v0.1.0，内核 tag v0.1.5）：出生证明套件 ✅（2026-09-10，决策：保留）
+
+- **目标**：谱系同源 ④——"谱系成员资格"制度化，不再靠口头契约。
+- **方案**：新 crate `crates/conformance`（独立版本，**零内核行为变更**）：7 项验收 = manifest 形状（A3）/ 注册即服务 / 热替换安全（K1）/ destroy 幂等 / health / 地基探针 B2（panic 隔离）/ 地基探针 K505（emit fail-fast）。
+- **验证（P ✅ / Q ✅ / I ✅）**：自检用例 `sample_resident_passes_full_suite`（合规居民 7/7 全绿）；内核既有测试零回归。
+- **发布口径说明**：PLAN 原记"无内核发布"，实际打 v0.1.5 tag——理由：套件需以 git tag 被居民仓引用；仅新增 crate，符合版本纪律（0.1.x 非破坏新增）。
+- **附带修复（v0.1.6）**：`certify_with_providers`——第二居民 mini-agent 实测暴露：有硬依赖的居民裸注册被 K302 正确拒绝，套件需支持前置提供者。**螺旋机制首次实证：新居民出生当天即回灌内核。**
+
+### P3（无内核发布）：第二个居民 mini-agent ✅（2026-09-10，北极星达成）
+
+- **目标**：谱系证明——"没有 react-agent，还可以有其他 agent"。
+- **实现**：`mini-agent`（独立仓 `skills/tool/mini-agent`）：`MiniLoop` 编排器（单轮感知→规划→收敛）+ 复用 react-agent 的 memory/llm-adapter guest + 独立组合根。
+- **验证（P ✅ / Q ✅ / I ✅）**：
+  - Q：`single_turn_chat_roundtrip_via_capability_addressing`（单轮 + 多轮记忆回环，纯 mock 无需解释器）；
+  - I：`mini_loop_passes_conformance_suite`（出生证明 7/7 全绿）。
+- **北极星核验**：不改内核一行（仅 tag 依赖 v0.1.6）、不改 react-agent 一行、独立装配即可运行——**达成**。
+- **备注**：编排器全程走 `call_capability`（K2 首个真实消费者）；实机 guest 路径（python/node 在位时）待冒烟，mock 路径已覆盖契约。
