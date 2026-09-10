@@ -61,8 +61,15 @@ fn check(name: &'static str, passed: bool, detail: String) -> Check {
     Check { name, passed, detail }
 }
 
-/// 对一个居民实现跑全套验收。所有检查相互独立（各自新内核 + 新实例）。
+/// 对一个居民实现跑全套验收（无外部依赖的居民用此入口）。
 pub async fn certify(make: ResidentFactory) -> Report {
+    certify_with_providers(make, Vec::new()).await
+}
+
+/// 带"前置提供者"的验收：居民的硬依赖 capability 由 providers 满足
+/// （内核 K302 会正确拒绝裸注册有硬依赖的居民——2026-09-10 第二个居民
+/// mini-agent 实测发现的套件缺口，据此引入）。
+pub async fn certify_with_providers(make: ResidentFactory, providers: Vec<PluginInstance>) -> Report {
     let mut checks = Vec::new();
 
     // ① 实例契约：manifest 形状合法（A3 装载期校验）
@@ -75,11 +82,14 @@ pub async fn certify(make: ResidentFactory) -> Report {
         });
     }
 
-    // ② 注册即服务：注册后 dispatch 可达（生命周期进入 Running 的外部可观测量）
+    // ② 注册即服务：前置提供者先行注册（满足 K302），居民随后——dispatch 可达
     {
         let k = fresh_kernel().await;
         let inst = make();
         let target = inst.manifest().name.clone();
+        for p in &providers {
+            k.register(p.clone()).await;
+        }
         k.register(inst).await;
         let res = k.dispatch(Envelope::new(target.clone(), json!({}))).await;
         checks.push(match res {
@@ -93,6 +103,9 @@ pub async fn certify(make: ResidentFactory) -> Report {
         let k = fresh_kernel().await;
         let inst = make();
         let target = inst.manifest().name.clone();
+        for p in &providers {
+            k.register(p.clone()).await;
+        }
         k.register(inst).await;
         k.hot_swap(target.clone(), make()).await;
         let res = k.dispatch(Envelope::new(target.clone(), json!({}))).await;
