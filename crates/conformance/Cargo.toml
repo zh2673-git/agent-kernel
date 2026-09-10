@@ -1,0 +1,17 @@
+[package]
+name = "agent-kernel-conformance"
+description = "agent-kernel 居民出生证明（P2）：任何 Plugin 实现的验收套件——实例契约 / 调度不变量 / 热替换安全 / 验收报告"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+rust-version = "1.75"
+
+[dependencies]
+agent-kernel-core = { path = "../core" }
+agent-kernel-sdk = { path = "../sdk" }
+agent-kernel-kernel = { path = "../kernel" }
+async-trait = "0.1"
+serde_json = "1"
+tokio = { version = "1", features = ["full", "macros", "test-util"] }
+
+[dev-dependencies]
