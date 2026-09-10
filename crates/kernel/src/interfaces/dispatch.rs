@@ -32,11 +32,12 @@ pub async fn dispatch(inner: Arc<KernelInner>, env: Envelope) -> Result<Value, K
         return Err(KernelError::NotRunning(env.target.clone(), state.to_string()));
     }
 
-    // 背压 / per-plugin 在途（B4）
+    // 背压 / per-plugin 在途（B4）；优先级泳道（T8，v0.1.7）：System 走全量闸，
+    // Normal 走预留后闸——Normal 打满时 System 仍即时受理。
     let deadline = env.deadline;
     let sched = inner.scheduler.clone(); // acquire 取 self: Arc<Self>，需 owned Arc
     let guards = sched
-        .acquire(&env.target, &slot.manifest, state, deadline)
+        .acquire(&env.target, &slot.manifest, state, env.priority, deadline)
         .await?;
 
     let plugin = slot.plugin.clone();

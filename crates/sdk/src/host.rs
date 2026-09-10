@@ -3,7 +3,7 @@
 //! 仅面向**进程内/可直连**场景；WASM/进程域通过各自的 host function / gRPC 桥接，
 //! 不应直接 `impl` 此 trait 跨 ABI。
 
-use crate::{Envelope, Event, KernelResult, TraceId};
+use crate::{Envelope, Event, KernelResult, Priority, TraceId};
 use async_trait::async_trait;
 use std::time::Duration;
 
@@ -31,6 +31,22 @@ pub trait HostApi: Send + Sync {
         deadline: Duration,
     ) -> KernelResult<serde_json::Value> {
         let _ = (capability, payload, deadline);
+        Err(crate::KernelError::UnknownCapability(capability.to_string()))
+    }
+
+    /// 带调用方身份的 capability 寻址（v0.1.7，S1 贯穿）：
+    /// `trace_id`（链路串联——补上 `call_capability` 每次新 trace 的缺口）与
+    /// `priority`（泳道，T8）由调用方显式指定，其余语义与 [`Self::call_capability`] 相同。
+    /// 增量方法（默认实现 K404），v0.1.4 的 `call_capability` 零改动兼容。
+    async fn call_capability_as(
+        &self,
+        capability: &str,
+        trace_id: TraceId,
+        priority: Priority,
+        payload: serde_json::Value,
+        deadline: Duration,
+    ) -> KernelResult<serde_json::Value> {
+        let _ = (capability, trace_id, priority, payload, deadline);
         Err(crate::KernelError::UnknownCapability(capability.to_string()))
     }
 

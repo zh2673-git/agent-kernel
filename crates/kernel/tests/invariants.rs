@@ -4,7 +4,7 @@
 //! 覆盖 B 组诡异 bug 防火墙：B2 panic 隔离、B4 drain 退化为 reject、B5 世代快照、
 //! 以及 A 组接口形状：A1 `&self` 句柄、A4 CAS 世代切换、依赖硬失败 K302。
 
-use agent_kernel_core::{Envelope, Event, KernelError, PluginId};
+use agent_kernel_core::{Envelope, Event, KernelError, PluginId, Priority, TraceId};
 use agent_kernel_kernel::Kernel;
 use agent_kernel_sdk::{GlobalConfig, HostApi, Manifest, Plugin, PluginContext, PluginInstance, PluginKind, ApiVersion, Version, Domain, Semantics, Capability, KernelResult, Envelope as Env};
 use async_trait::async_trait;
@@ -432,15 +432,16 @@ impl Plugin for NamedPlugin {
     async fn init(&self, _ctx: &PluginContext) -> KernelResult<()> {
         Ok(())
     }
-    async fn on_event(&self, _env: Env) -> KernelResult<serde_json::Value> {
-        Ok(json!({ "name": self.respond_name }))
+    async fn on_event(&self, env: Env) -> KernelResult<serde_json::Value> {
+        // v0.1.7（S1）：回显调用方 trace_id——call_capability_as 链路串联的断言依据
+        Ok(json!({ "name": self.respond_name, "trace_id": env.trace_id.to_string() }))
     }
     fn destroy(&self) -> KernelResult<()> {
         Ok(())
     }
 }
 
-/// 捕获 HostApi 并按 payload.cap 调 call_capability 的测试插件（寻址的调用方侧）。
+/// 捕获 HostApi 并按 payload.cap 调 call_capability_as 的测试插件（寻址的调用方侧）。
 struct CallCapPlugin {
     manifest: Manifest,
     host: OnceLock<Arc<dyn HostApi>>,
@@ -483,8 +484,17 @@ impl Plugin for CallCapPlugin {
     async fn on_event(&self, env: Env) -> KernelResult<serde_json::Value> {
         let host = self.host.get().expect("host not initialized");
         let cap = env.payload.get("cap").and_then(serde_json::Value::as_str).unwrap_or("svc");
-        match host.call_capability(cap, json!({}), Duration::from_millis(1000)).await {
-            Ok(v) => Ok(v),
+        // v0.1.7：走 call_capability_as——自带 trace_id/priority 身份（S1/T8 消费形态）
+        let tid = TraceId::new();
+        match host
+            .call_capability_as(cap, tid, Priority::System, json!({}), Duration::from_millis(1000))
+            .await
+        {
+            Ok(mut v) => {
+                v["trace_ok"] =
+                    json!(v.get("trace_id").and_then(serde_json::Value::as_str) == Some(&tid.to_string()));
+                Ok(v)
+            }
             Err(e) => Ok(json!({ "code": e.code() })),
         }
     }
@@ -499,12 +509,13 @@ async fn k2_call_capability_resolves_and_follows_hot_swap() {
     k.register(NamedPlugin::new("svc-v1", "svc", "v1")).await;
     k.register(CallCapPlugin::new("cc")).await;
 
-    // ① 按 capability 寻址命中提供者（调用方未硬编码插件名）
+    // ① 按 capability 寻址命中提供者（调用方未硬编码插件名）+ trace 贯穿（S1）
     let r = k
         .dispatch(Envelope::new(PluginId::new("cc"), json!({})))
         .await
         .unwrap();
     assert_eq!(r["name"], json!("v1"), "call_capability 应命中 svc 提供者: {r:?}");
+    assert_eq!(r["trace_ok"], json!(true), "调用方 trace_id 必须贯穿到提供者: {r:?}");
 
     // ② 热替换后新调用动态流向新实例（解析每次查当前索引，非注册期固化）
     k.hot_swap(PluginId::new("svc-v1"), NamedPlugin::new("svc-v1", "svc", "v2"))
@@ -525,4 +536,105 @@ async fn k2_unknown_capability_is_k404() {
         .await
         .unwrap();
     assert_eq!(r["code"], json!("K404"), "未注册 capability 应返回 K404: {r:?}");
+}
+
+// ---- T8（v0.1.7）：优先级泳道——Normal 泳道打满后 System 仍即时受理 ----
+
+/// Concurrent 慢插件（max_inflight=2 → Normal 泳道容量 1，全量 2）。
+struct SlowConcurrentPlugin {
+    manifest: Manifest,
+    respond_name: &'static str,
+    delay: Duration,
+}
+
+impl SlowConcurrentPlugin {
+    fn new(id: &'static str, respond_name: &'static str, delay: Duration) -> PluginInstance {
+        Arc::new(Self {
+            manifest: Manifest {
+                name: PluginId::new(id),
+                kind: PluginKind::Capability,
+                version: Version::new(0, 1, 0),
+                api_version: ApiVersion::new(1, 0),
+                capabilities: vec![],
+                dependencies: vec![],
+                domain: Domain::InProcess,
+                semantics: Semantics::Concurrent,
+                priority: 1,
+                max_inflight: Some(2),
+                fuel_limit: None,
+                host_timeout_ms: None,
+                epoch_interval_ms: None,
+                subscriptions: vec![],
+            },
+            respond_name,
+            delay,
+        })
+    }
+}
+
+#[async_trait]
+impl Plugin for SlowConcurrentPlugin {
+    fn id(&self) -> PluginId {
+        self.manifest.name.clone()
+    }
+    fn manifest(&self) -> &Manifest {
+        &self.manifest
+    }
+    async fn init(&self, _ctx: &PluginContext) -> KernelResult<()> {
+        Ok(())
+    }
+    async fn on_event(&self, env: Env) -> KernelResult<serde_json::Value> {
+        // System 优先级立即返回——"完成"才能证明"被受理"（否则 400ms 处理器本身淹没信号）
+        if env.priority == Priority::System {
+            return Ok(json!({ "name": self.respond_name }));
+        }
+        tokio::time::sleep(self.delay).await;
+        Ok(json!({ "name": self.respond_name }))
+    }
+    fn destroy(&self) -> KernelResult<()> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn k7_system_priority_bypasses_saturated_normal_lane() {
+    let k = fresh_kernel().await;
+    k.register(SlowConcurrentPlugin::new("sw2", "sw2", Duration::from_millis(400))).await;
+
+    let dispatch_with = |k: Arc<Kernel>, priority: Priority| {
+        tokio::spawn(async move {
+            let env = Envelope {
+                target: PluginId::new("sw2"),
+                trace_id: TraceId::new(),
+                priority,
+                deadline: Some(Duration::from_millis(2000)),
+                payload: json!({}),
+            };
+            k.dispatch(env).await
+        })
+    };
+
+    // ① Normal 慢调用占满 Normal 泳道（容量 1）
+    let first = dispatch_with(k.clone(), Priority::Normal);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    // ② 第二个 Normal → 在 Normal 泳道排队（首个 400ms 完成前不得受理）
+    let second_normal = dispatch_with(k.clone(), Priority::Normal);
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    // ③ System（T8）→ 走全量泳道，在 Normal 排队期间即时受理
+    let t0 = std::time::Instant::now();
+    let system = dispatch_with(k.clone(), Priority::System);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(
+        system.is_finished(),
+        "Normal 泳道打满时 System 必须即时受理（泳道未生效）: {:?}",
+        t0.elapsed()
+    );
+    assert!(!second_normal.is_finished(), "第二个 Normal 应仍在排队（Normal 泳道容量 1）");
+
+    let r1 = first.await.unwrap().unwrap();
+    assert_eq!(r1["name"], json!("sw2"));
+    let _sys = system.await.unwrap().unwrap();
+    assert!(t0.elapsed() < Duration::from_millis(350), "System 泳道不应等待 Normal: {:?}", t0.elapsed());
+    let r2 = second_normal.await.unwrap().unwrap();
+    assert_eq!(r2["name"], json!("sw2"));
 }

@@ -2,7 +2,7 @@
 
 use crate::interfaces::dispatch;
 use crate::runtime::KernelInner;
-use agent_kernel_core::{Envelope, Event, KernelError, TraceId};
+use agent_kernel_core::{Envelope, Event, KernelError, Priority, TraceId};
 use agent_kernel_sdk::HostApi;
 use async_trait::async_trait;
 use serde_json::Value;
@@ -39,9 +39,28 @@ impl HostApi for KernelHost {
     ) -> Result<Value, KernelError> {
         // K2（v0.1.4）：动态解析 → 复用 dispatch 全链（B5/B2/B4/deadline 全部继承）。
         // 解析每次查当前索引 → 与 hot_swap 兼容（换实现后新调用流向新实例）。
+        self.call_capability_as(capability, TraceId::new(), Priority::Normal, payload, deadline)
+            .await
+    }
+
+    async fn call_capability_as(
+        &self,
+        capability: &str,
+        trace_id: TraceId,
+        priority: Priority,
+        payload: Value,
+        deadline: std::time::Duration,
+    ) -> Result<Value, KernelError> {
+        // v0.1.7（S1/T8）：调用方身份（trace_id/priority）显式传入——链路串联与
+        // 泳道调度在 capability 寻址路径上与 call_plugin 同权。
         let target = self.inner.cap_provider(capability)?;
-        let mut env = Envelope::new(target, payload);
-        env.deadline = Some(deadline);
+        let env = Envelope {
+            target,
+            trace_id,
+            priority,
+            deadline: Some(deadline),
+            payload,
+        };
         dispatch::dispatch(self.inner.clone(), env).await
     }
 
