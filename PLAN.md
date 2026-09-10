@@ -222,6 +222,25 @@
 - **发布口径说明**：PLAN 原记"无内核发布"，实际打 v0.1.5 tag——理由：套件需以 git tag 被居民仓引用；仅新增 crate，符合版本纪律（0.1.x 非破坏新增）。
 - **附带修复（v0.1.6）**：`certify_with_providers`——第二居民 mini-agent 实测暴露：有硬依赖的居民裸注册被 K302 正确拒绝，套件需支持前置提供者。**螺旋机制首次实证：新居民出生当天即回灌内核。**
 
+### v0.1.7（追加）：优先级泳道 + 寻址链路贯穿 ✅（2026-09-10，决策：保留）
+
+> 触发：用户复核挂起项——"这两个现在就能做，为什么等 0.2？"复核成立：均为纯增量，随做随发
+> （0.1.x 纪律内），居民侧可立即消费。此前归入挂起属于分类错误（把"要动内核"误当挂起理由）。
+
+- **T8 落地**：调度器双泳道——System 走全量闸（total/lanes.all），Normal 走预留后闸
+  （total_normal/lanes.normal，容量 = 全量 − 1；全量=1 退化为不预留防饿死）。两套闸互不
+  重叠：Normal 打满时 System 仍即时受理；Normal 拿不到预留位（防反向饿死）。dispatch 传入
+  `env.priority`。
+- **S1 闭合**：`HostApi::call_capability_as(capability, trace_id, priority, payload, deadline)`
+  （增量方法，默认 K404；v0.1.4 的 call_capability 零改动兼容）——调用方 trace_id/priority
+  显式传入，寻址路径与 call_plugin 同权。
+- **验证（P ✅ / Q ✅ / I ✅）**：Q=新增 `k7_system_priority_bypasses_saturated_normal_lane`
+  （Normal 泳道打满 → System 即时受理、第二 Normal 排队；修复前 System 同样被淹没）+
+  k2 增加 trace 贯穿断言；I=invariants 11/11 + conformance 全绿 + react-agent v0.1.16 全量
+  18 组绿（居民消费实证）。
+- **结果**：react-agent v0.1.16 随即消费——cancel abort 走 System 泳道（T8 闭环）、跨插件
+  调用 trace 贯穿（S1 闭环，契约测试新增同链断言）。
+
 ### P3（无内核发布）：第二个居民 mini-agent ✅（2026-09-10，北极星达成）
 
 - **目标**：谱系证明——"没有 react-agent，还可以有其他 agent"。
