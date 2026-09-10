@@ -54,6 +54,9 @@ pub enum KernelError {
         expected: Generation,
         found: Generation,
     },
+    /// K505：事件总线未启动（`Kernel::run()` 未运行时 emit；fail-fast 拒绝静默积压，B1）。
+    #[error("[K505] event bus not running: Kernel::run() not started; emit rejected (fail-fast, no silent buffering)")]
+    EventBusNotRunning,
 
     // ---- 迁移 ----
     /// K600：插件未实现 Migratable（默认返回，C2）。
@@ -87,6 +90,7 @@ impl KernelError {
             KernelError::DeadlineExceeded(_) => "K502",
             KernelError::Cancelled(_) => "K503",
             KernelError::GenerationMismatch { .. } => "K504",
+            KernelError::EventBusNotRunning => "K505",
             KernelError::MigrationUnsupported(_) => "K600",
             KernelError::DomainUnavailable(_) => "K700",
             KernelError::Internal(_) => "K999",

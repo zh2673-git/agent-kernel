@@ -124,6 +124,13 @@ impl KernelInner {
             }
         }
 
+        // B4（v0.1.3 K1）：CAS 前等待在途请求收敛——与 unload 的 drain 语义对齐。
+        // 否则在途调用跨世代执行：旧实例私有的会话控制态（如取消令牌）与新实例断裂。
+        // 超时按 unload 同款语义（5s）强制继续，护栏而非无限等待。
+        self.scheduler
+            .drain_wait(id, std::time::Duration::from_millis(5000))
+            .await;
+
         // CAS 切换（expected = plan.from_gen）
         let new_slot = Slot {
             plugin: new_instance,

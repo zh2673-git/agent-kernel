@@ -35,6 +35,14 @@ pub trait Plugin: Send + Sync + 'static {
     }
 
     /// 可选的编排钩子：编排插件可实现以驱动 agent 主循环。
+    ///
+    /// 已废弃（v0.1.3，K3 收口）：内核从未调用本钩子（死 API，制造"内核驱动编排"
+    /// 的模糊预期）。同步编排由居民自驱（先例：react-agent 经 host dispatch 驱动），
+    /// 事件驱动走 `Kernel::run()` + `subscriptions`。首个破坏性版本将删除。
+    #[deprecated(
+        since = "0.1.3",
+        note = "内核从不调用本钩子（死 API）；同步编排由居民自驱，事件驱动用 run() + subscriptions。将于首个破坏性版本删除"
+    )]
     async fn step(&self, _ctx: &KernelContext) -> KernelResult<()> {
         Ok(())
     }

@@ -87,6 +87,10 @@ impl Kernel {
     }
 
     /// 启动主事件循环（时间流）。事件按订阅路由到插件。
+    ///
+    /// **可选通道**（v0.1.3 K3）：本循环只服务 EventBus 订阅分发；同步 dispatch
+    /// （`Kernel::dispatch` / `HostApi::call_plugin`）不依赖它。不调用 `run()` 时
+    /// 内核仍是功能完整的调度器，仅 `emit` 会快速失败（K505）。
     pub async fn run(self: Arc<Self>) {
         let mut rx = self.inner.bus.take_event_rx();
         self.inner.running.store(true, Ordering::SeqCst);

@@ -19,6 +19,11 @@ pub struct KernelHost {
 #[async_trait]
 impl HostApi for KernelHost {
     async fn emit(&self, event: Event) -> Result<(), KernelError> {
+        // B1/K505（v0.1.3 K3）：事件总线是可选调试通道——`Kernel::run()` 未启动时
+        // 快速失败，拒绝静默积压（有界 mpsc 满后会阻塞发布者，延迟暴露更难排查）。
+        if !self.inner.running.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(KernelError::EventBusNotRunning);
+        }
         self.inner.bus.publish_event(event).await
     }
 
@@ -31,6 +36,7 @@ impl HostApi for KernelHost {
         start.elapsed().as_nanos() as u64
     }
 
+    #[allow(deprecated)] // K4：trace_id 已废弃，实现保留至首个破坏性版本删除
     fn trace_id(&self) -> TraceId {
         TraceId::new()
     }

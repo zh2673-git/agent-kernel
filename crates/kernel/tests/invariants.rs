@@ -4,12 +4,12 @@
 //! 覆盖 B 组诡异 bug 防火墙：B2 panic 隔离、B4 drain 退化为 reject、B5 世代快照、
 //! 以及 A 组接口形状：A1 `&self` 句柄、A4 CAS 世代切换、依赖硬失败 K302。
 
-use agent_kernel_core::{Envelope, KernelError, PluginId};
+use agent_kernel_core::{Envelope, Event, KernelError, PluginId};
 use agent_kernel_kernel::Kernel;
-use agent_kernel_sdk::{GlobalConfig, Manifest, Plugin, PluginContext, PluginInstance, PluginKind, ApiVersion, Version, Domain, Semantics, Capability, KernelResult, Envelope as Env};
+use agent_kernel_sdk::{GlobalConfig, HostApi, Manifest, Plugin, PluginContext, PluginInstance, PluginKind, ApiVersion, Version, Domain, Semantics, Capability, KernelResult, Envelope as Env};
 use async_trait::async_trait;
 use serde_json::json;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 // ---- 测试用最小插件 ----
@@ -219,4 +219,174 @@ async fn c2_default_migratable_unsupported() {
     // 未实现 Migratable => as_migratable 返回 None
     assert!(p.as_migratable().is_none());
     let _ = Duration::from_millis(1); // 确保 Duration 已导入
+}
+
+// ---- B4（v0.1.3 K1）：hot_swap 必须等在途收敛（drain）后才 CAS 切换 ----
+
+/// 慢响应插件：on_event 睡眠 delay 后返回自报名（用于区分世代）。
+struct SlowPlugin {
+    manifest: Manifest,
+    respond_name: &'static str,
+    delay: Duration,
+}
+
+impl SlowPlugin {
+    fn new(id: &'static str, respond_name: &'static str, delay: Duration) -> PluginInstance {
+        let manifest = Manifest {
+            name: PluginId::new(id),
+            kind: PluginKind::Capability,
+            version: Version::new(0, 1, 0),
+            api_version: ApiVersion::new(1, 0),
+            capabilities: vec![],
+            dependencies: vec![],
+            domain: Domain::InProcess,
+            semantics: Semantics::Serial,
+            priority: 1,
+            max_inflight: Some(4),
+            fuel_limit: None,
+            host_timeout_ms: None,
+            epoch_interval_ms: None,
+            subscriptions: vec![],
+        };
+        Arc::new(Self { manifest, respond_name, delay })
+    }
+}
+
+#[async_trait]
+impl Plugin for SlowPlugin {
+    fn id(&self) -> PluginId {
+        self.manifest.name.clone()
+    }
+    fn manifest(&self) -> &Manifest {
+        &self.manifest
+    }
+    async fn init(&self, _ctx: &PluginContext) -> KernelResult<()> {
+        Ok(())
+    }
+    async fn on_event(&self, _env: Env) -> KernelResult<serde_json::Value> {
+        tokio::time::sleep(self.delay).await;
+        Ok(json!({ "name": self.respond_name }))
+    }
+    fn destroy(&self) -> KernelResult<()> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn k1_hot_swap_waits_for_inflight_to_drain() {
+    let k = fresh_kernel().await;
+    k.register(SlowPlugin::new("sw", "sw", Duration::from_millis(400))).await;
+
+    // 在途慢调用（~400ms 后由旧实例完成）
+    let inflight = tokio::spawn({
+        let k = k.clone();
+        async move { k.dispatch(Envelope::new(PluginId::new("sw"), json!({}))).await }
+    });
+    tokio::time::sleep(Duration::from_millis(100)).await; // 确保在途已进入 on_event
+
+    // 发起热替换：修复前直接 CAS（~ms 级完成），修复后必须等在途收敛
+    let t0 = std::time::Instant::now();
+    let swapper = tokio::spawn({
+        let k = k.clone();
+        async move { k.hot_swap(PluginId::new("sw"), SlowPlugin::new("sw", "swv2", Duration::ZERO)).await }
+    });
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(
+        !swapper.is_finished(),
+        "在途未收敛时 hot_swap 不得完成（B4 未闭合于热替换路径）"
+    );
+
+    // B5：旧在途请求由旧实例完成，结果不受切换影响
+    let r1 = inflight.await.unwrap().unwrap();
+    assert_eq!(r1["name"], json!("sw"));
+    swapper.await.unwrap();
+    assert!(
+        t0.elapsed() >= Duration::from_millis(250),
+        "hot_swap 必须等待 drain（在途 400ms，100ms 时发起），实测 {:?}",
+        t0.elapsed()
+    );
+
+    // 切换后新请求由新实例服务
+    let r2 = k.dispatch(Envelope::new(PluginId::new("sw"), json!({}))).await.unwrap();
+    assert_eq!(r2["name"], json!("swv2"));
+}
+
+// ---- B1/K505（v0.1.3 K3）：事件总线未启动时 emit 快速失败，拒绝静默积压 ----
+
+/// 捕获 HostApi 并按需 emit 的测试插件（emit 结果以 payload 回传便于断言）。
+struct EmitPlugin {
+    manifest: Manifest,
+    host: OnceLock<Arc<dyn HostApi>>,
+}
+
+impl EmitPlugin {
+    fn new(name: &'static str) -> PluginInstance {
+        let manifest = Manifest {
+            name: PluginId::new(name),
+            kind: PluginKind::Capability,
+            version: Version::new(0, 1, 0),
+            api_version: ApiVersion::new(1, 0),
+            capabilities: vec![],
+            dependencies: vec![],
+            domain: Domain::InProcess,
+            semantics: Semantics::Serial,
+            priority: 1,
+            max_inflight: Some(4),
+            fuel_limit: None,
+            host_timeout_ms: None,
+            epoch_interval_ms: None,
+            subscriptions: vec![],
+        };
+        Arc::new(Self { manifest, host: OnceLock::new() })
+    }
+}
+
+#[async_trait]
+impl Plugin for EmitPlugin {
+    fn id(&self) -> PluginId {
+        self.manifest.name.clone()
+    }
+    fn manifest(&self) -> &Manifest {
+        &self.manifest
+    }
+    async fn init(&self, ctx: &PluginContext) -> KernelResult<()> {
+        let _ = self.host.set(ctx.kernel.host.clone());
+        Ok(())
+    }
+    async fn on_event(&self, _env: Env) -> KernelResult<serde_json::Value> {
+        let host = self.host.get().expect("host not initialized");
+        match host.emit(Event::new("test-event", json!({}))).await {
+            Ok(()) => Ok(json!({ "emitted": true })),
+            Err(e) => Ok(json!({ "emitted": false, "code": e.code() })),
+        }
+    }
+    fn destroy(&self) -> KernelResult<()> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn k3_emit_fails_fast_without_run() {
+    let k = fresh_kernel().await;
+    k.register(EmitPlugin::new("em")).await;
+
+    // run() 未启动：emit 必须快速失败（K505），而非静默入队（修复前会成功入队且无人消费）
+    let r = k
+        .dispatch(Envelope::new(PluginId::new("em"), json!({})))
+        .await
+        .unwrap();
+    assert_eq!(r["emitted"], json!(false), "未 run() 时 emit 不得静默成功: {r:?}");
+    assert_eq!(r["code"], json!("K505"));
+
+    // run() 启动后：事件被主循环消费，emit 成功
+    let runner = tokio::spawn(k.clone().run());
+    tokio::time::sleep(Duration::from_millis(50)).await; // 等 running 置位
+    let r2 = k
+        .dispatch(Envelope::new(PluginId::new("em"), json!({})))
+        .await
+        .unwrap();
+    assert_eq!(r2["emitted"], json!(true));
+
+    k.stop();
+    let _ = runner.await;
 }
