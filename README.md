@@ -213,14 +213,14 @@ my-agent/                         ← 下游项目根（产品）
 | `ProcessDomain`（进程域） | ✅ 已跑通（**gRPC 传输**：tonic + protobuf，stub 由 `schema/kernel.proto` 经 `build.rs` 生成；`OnEvent` 为一请求一响应 unary RPC；e2e 验证内核 spawn Rust/Python/node 子进程插件并往返 dispatch；握手协商 ApiVersion，EOF/崩溃收敛为 K700，deadline 超时 K502；**并发语义**：`Semantics::Concurrent` 允许并发在途 RPC——host 代理锁内克隆 client、锁外 await，`Serial` 的串行化由插件级锁保证）。需本机安装 `protoc` |
 | `WasmDomain`（WASM 域） | ✅ 已跑通（wasmtime 组件模型装载 `kernel.wit` 组件；B3 燃料+epoch 双时间上限；WASI p2 基础接口、**不开放网络**；e2e 验证内核装载 `wasm32-wasip2` 组件并往返 dispatch）。构建组件：`cargo run --bin xtask -- build-wasm` |
 | dylib 动态装载（`plugin!` 宏 + dlopen） | ✅ 已跑通（sdk 导出 `_KERNEL_PLUGIN_ABI` 守卫 + `_kernel_plugin_create`；加载器纯 std 实现 LoadLibrary/dlopen；构造 panic 被 `catch_unwind` 收敛为 null。**同编译器契约**：dylib 与宿主须同 rustc + 同版本 sdk，否则 ABI 守卫拒绝）。构建插件：`cargo run --bin xtask -- build-dylib` |
-| 跨语言 L3 绑定（Python / TS） | ✅ 已跑通（`bindings/python` 经 `grpcio` + `grpc_tools.protoc` 生成 stub；`bindings/typescript` 经 `@grpc/grpc-js` + `@grpc/proto-loader` 运行时加载 `kernel.proto`，免代码生成；e2e 验证内核 spawn python / `node --experimental-strip-types` 插件并往返 dispatch；与 Rust guest 同一 gRPC 协议） |
+| 跨语言 L3 绑定（Python / TS） | ✅ 已跑通（`bindings/python` 经 `grpcio` + `grpc_tools.protoc` 生成 stub；`bindings/typescript` 经 `@grpc/grpc-js` + `@grpc/proto-loader` 运行时加载 `kernel.proto`，免代码生成；e2e 验证内核 spawn python / `node --experimental-strip-types` 插件并往返 dispatch；与 Rust guest 同一 gRPC 协议；v0.1.8 起绑定层把 `deadline`/`priority` 原样透传进 Envelope，契约字段不再被静默丢弃） |
 
 ---
 
 ## 后续路线
 
 1. ✅ Process 域传输已升级为 gRPC（tonic + protobuf，详见上文；Python/TS SDK 已同步升级）。
-2. ✅ 内核已发布 GitHub（git 依赖可引用）；待用第一个真实外部插件项目验证「仅依赖、不改内核源码」路径；crates.io 发布可选。
+2. ✅ 内核已发布 GitHub（git 依赖可引用）；「仅依赖、不改内核源码」路径已由 react-agent / rsi-agent 实证（两者均以 git tag 依赖本内核，含 Python/TS guest）；crates.io 发布可选。
 3. 充实示例插件：LLM 适配器、agent 主循环、记忆、工具注册。
 4. （可选）流式 RPC：需要 LLM token 流等真流式时，于 `kernel.proto` 新增 `OnEventStream` 双向流 RPC（已留注释位）。
 
