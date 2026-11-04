@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agent-kernel · 宣传片《不写代码，写写代码这件事》</title>
+<meta name="description" content="agent-kernel 宣传片：一个只做三件事的 agent 运行时内核——开辟空间、编排时间、强制规则。全片由代码逐镜绘制，2 分 15 秒。">
+<meta property="og:title" content="agent-kernel · 宣传片">
+<meta property="og:description" content="一个只做三件事的内核：开辟空间，编排时间，强制规则。">
+<meta property="og:type" content="video.other">
+<meta property="og:image" content="https://zh2673-git.github.io/agent-kernel/media/agent-kernel-poster.jpg">
+<meta property="og:video" content="https://zh2673-git.github.io/agent-kernel/media/agent-kernel.mp4">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #03060b; color: #e9f1f9; }
+  body {
+    font-family: 'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 32px 20px 40px;
+  }
+  .film { width: min(1200px, 100%); }
+  .kicker {
+    font-size: 12px; letter-spacing: .26em; text-transform: uppercase;
+    color: #5fd0e8; margin: 0 0 14px; text-align: center;
+  }
+  h1 {
+    font-size: clamp(20px, 3.2vw, 34px); font-weight: 700; line-height: 1.35;
+    text-align: center; margin: 0 0 8px; letter-spacing: .04em;
+  }
+  .sub { text-align: center; color: #8ea6be; font-size: 14px; margin: 0 0 26px; }
+  .player {
+    position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000;
+    border: 1px solid rgba(95, 208, 232, .18);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, .7);
+  }
+  .player video { width: 100%; height: 100%; display: block; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 10px 22px; justify-content: space-between;
+    margin-top: 18px; font-size: 13px; color: #5f7690;
+  }
+  .meta a { color: #b9cde2; text-decoration: none; border-bottom: 1px solid rgba(185, 205, 226, .3); }
+  .meta a:hover { color: #e9f1f9; border-color: #e9f1f9; }
+  footer { margin-top: 34px; font-size: 12px; color: #31445a; letter-spacing: .08em; text-align: center; line-height: 1.9; }
+</style>
+</head>
+<body>
+<main class="film">
+  <p class="kicker">agent-kernel · showcase</p>
+  <h1>不写代码，写写代码这件事</h1>
+  <p class="sub">空间 · 时间 · 规则 —— 三件事的内核，撑起一切可替换的能力</p>
+  <div class="player">
+    <video controls playsinline preload="metadata" poster="media/agent-kernel-poster.jpg">
+      <source src="media/agent-kernel.mp4" type="video/mp4">
+      你的浏览器不支持视频播放，可<a href="media/agent-kernel.mp4">下载观看</a>。
+    </video>
+  </div>
+  <div class="meta">
+    <span>2 分 15 秒 · 20 镜 · 1920×1080 · 30fps</span>
+    <span><a href="https://github.com/zh2673-git/agent-kernel">github.com/zh2673-git/agent-kernel</a></span>
+  </div>
+  <footer>
+    全片由 make-video 代码逐镜绘制（HTML Canvas + MV 动效原语），无任何第三方图像/视频生成<br>
+    旁白为 TTS 合成，配乐为程序化编写的交响床垫
+  </footer>
+</main>
+</body>
+</html>

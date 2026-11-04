@@ -2,6 +2,14 @@
 
 > GitHub：**https://github.com/zh2673-git/agent-kernel** ｜ 许可证：MIT OR Apache-2.0 ｜ 进度快照见 `docs/PROGRESS.md`
 
+## 宣传片
+
+[![《不写代码，写写代码这件事》宣传片](docs/media/agent-kernel-poster.jpg)](https://zh2673-git.github.io/agent-kernel/showcase.html)
+
+《不写代码，写写代码这件事》——2 分 15 秒，20 镜，全片由代码逐镜绘制（HTML Canvas + 动效原语），
+讲一个只做三件事的内核如何把 agent 拆成"能变的"与"不该变的"。
+[▶ 在线观看](https://zh2673-git.github.io/agent-kernel/showcase.html)
+
 一个 **agent 运行时内核**：内核只做三件事——**开辟/隔离插件的空间、编排插件的执行时间流、强制校验插件契约与权限**。所有具体能力（LLM 适配器、工具、记忆、规划/编排、提示词、向量库……）全部以**插件**形式挂载到内核，并支持**不停机热替换**。
 
 ---
