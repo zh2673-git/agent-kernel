@@ -26,7 +26,10 @@ message Envelope {
   string span_id  = 2;
   string ty       = 3;
   bytes  payload  = 4;
+  // 调度优先级：沿用内核 Priority 枚举（Background=0 / Normal=1 / User=2 / System=3）。
   uint32 priority = 5;
+  // 相对截止**时长**（毫秒），非绝对时间戳——进程本地 Instant 跨 ABI 无意义（A2）；
+  // 未设 = 无硬截止。内核侧映射：env.deadline.as_millis()（process/host.rs to_proto）。
   optional uint64 deadline_ms = 6;
   string idempotency_key = 7;
 }

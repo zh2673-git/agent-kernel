@@ -69,7 +69,14 @@ class _Servicer(kernel_pb2_grpc.PluginServiceServicer):
         except json.JSONDecodeError:
             payload = None
         try:
-            value = self._plugin.on_event({"target": request.ty, "payload": payload})
+            # 契约显式化（P6）：deadline_ms（相对毫秒，未设=None）与 priority（内核
+            # Priority 枚举值）原样透传——契约字段在绑定层不得静默丢弃。
+            value = self._plugin.on_event({
+                "target": request.ty,
+                "payload": payload,
+                "deadline_ms": request.deadline_ms if request.HasField("deadline_ms") else None,
+                "priority": request.priority,
+            })
         except Exception as e:  # noqa: BLE001
             context.abort(grpc.StatusCode.INTERNAL, f"on_event failed: {e}")
         return kernel_pb2.Envelope(

@@ -250,3 +250,17 @@
   - I：`mini_loop_passes_conformance_suite`（出生证明 7/7 全绿）。
 - **北极星核验**：不改内核一行（仅 tag 依赖 v0.1.6）、不改 react-agent 一行、独立装配即可运行——**达成**。
 - **备注**：编排器全程走 `call_capability`（K2 首个真实消费者）；实机 guest 路径（python/node 在位时）待冒烟，mock 路径已覆盖契约。
+## v0.1.8（追加）：契约显式化 P6 —— 绑定层 deadline/priority 透传 ✅（2026-11-04，决策：保留）
+
+- **来源**：rsi-agent 居民活体迭代（P6 补丁，生产验证后回灌）。
+- **改动**：
+  - schema/kernel.proto：Envelope 字段注释显式化（deadline_ms 为相对时长毫秒非绝对时间戳；
+    priority 沿用内核 Priority 枚举；均经 process/host.rs to_proto 真实传递）；
+  - bindings/python guest.py：OnEvent 将 deadline_ms（HasField 判空 → None）与 priority
+    原样透传进 envelope dict——契约字段在绑定层不再被静默丢弃；
+  - bindings/typescript index.ts：onEvent 同语义透传（deadlineMs>0 else null）。
+- **契约影响**：纯显式化，wire format 零变化；插件可感知超时预算/优先级（此前只能瞎猜）。
+- **验证（P ✅ / Q ✅ / I ✅）**：cargo check 干净；workspace 29 suites 18 tests 全绿；
+  py guest import OK；ts --check OK。
+- **备注**：本轮回灌同时确认内核 triple（proto+py+ts）与 rsi-agent runtime 内嵌副本一致；
+  下游（rsi-agent）以 git tag v0.1.8 升级内核依赖。

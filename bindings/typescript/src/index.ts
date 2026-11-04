@@ -99,7 +99,14 @@ export async function serve(plugin: Plugin, defaultApiVersion = "0.1"): Promise<
       }
       let value: unknown;
       try {
-        value = await plugin.onEvent({ target: env?.ty ?? "", payload });
+        // 契约显式化（P6）：deadlineMs（相对毫秒，未设=0→null）与 priority 原样透传——
+        // 契约字段在绑定层不得静默丢弃。proto-loader keepCase:false → camelCase。
+        value = await plugin.onEvent({
+          target: env?.ty ?? "",
+          payload,
+          deadlineMs: typeof env?.deadlineMs === "number" && env.deadlineMs > 0 ? env.deadlineMs : null,
+          priority: env?.priority ?? 1,
+        });
       } catch (e) {
         cb({ code: grpc.status.INTERNAL, message: String(e) });
         return;
