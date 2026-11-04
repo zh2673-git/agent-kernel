@@ -4,66 +4,79 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>agent-kernel · 宣传片《不写代码，写写代码这件事》</title>
-<meta name="description" content="agent-kernel 宣传片：一个只做三件事的 agent 运行时内核——开辟空间、编排时间、强制规则。全片由代码逐镜绘制，2 分 15 秒。">
-<meta property="og:title" content="agent-kernel · 宣传片">
-<meta property="og:description" content="一个只做三件事的内核：开辟空间，编排时间，强制规则。">
+<meta name="description" content="agent-kernel 宣传片：只做三件事的内核 —— 空间 / 时间 / 规则。20 镜 / 2 分 09 秒，亮调纸感，真人克隆音色与卡通主讲同框，真实素材与代码绘制混用。">
+<meta property="og:title" content="agent-kernel · 宣传片《不写代码，写写代码这件事》">
+<meta property="og:description" content="地基建好，进化才敢发生。">
 <meta property="og:type" content="video.other">
-<meta property="og:image" content="https://zh2673-git.github.io/agent-kernel/media/agent-kernel-poster.jpg">
-<meta property="og:video" content="https://zh2673-git.github.io/agent-kernel/media/agent-kernel.mp4">
+<meta property="og:image" content="https://zh2673-git.github.io/agent-kernel/docs/media/agent-kernel-poster.jpg">
+<meta property="og:video" content="https://zh2673-git.github.io/agent-kernel/docs/media/agent-kernel.mp4">
 <style>
-  :root { color-scheme: dark; }
+  :root { color-scheme: light; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #03060b; color: #e9f1f9; }
+  html, body { margin: 0; padding: 0; background: #f4efe4; color: #2b333d; }
   body {
     font-family: 'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif;
     min-height: 100vh;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 32px 20px 40px;
+    padding: 34px 20px 44px;
+    background-image:
+      radial-gradient(ellipse at 50% 0%, #fffdf7 0%, #f4efe4 46%, #ebe4d5 100%),
+      repeating-linear-gradient(0deg, rgba(86,72,50,0.018) 0 1px, transparent 1px 3px);
   }
   .film { width: min(1200px, 100%); }
   .kicker {
     font-size: 12px; letter-spacing: .26em; text-transform: uppercase;
-    color: #5fd0e8; margin: 0 0 14px; text-align: center;
+    color: #0d6e86; margin: 0 0 14px; text-align: center; font-weight: 700;
   }
   h1 {
-    font-size: clamp(20px, 3.2vw, 34px); font-weight: 700; line-height: 1.35;
-    text-align: center; margin: 0 0 8px; letter-spacing: .04em;
+    font-size: clamp(21px, 3.3vw, 36px); font-weight: 800; line-height: 1.32;
+    text-align: center; margin: 0 0 8px; letter-spacing: .03em; color: #1d242c;
   }
-  .sub { text-align: center; color: #8ea6be; font-size: 14px; margin: 0 0 26px; }
+  .sub { text-align: center; color: #6a7480; font-size: 14px; margin: 0 0 26px; }
   .player {
-    position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000;
-    border: 1px solid rgba(95, 208, 232, .18);
-    box-shadow: 0 24px 80px rgba(0, 0, 0, .7);
+    position: relative; width: 100%; aspect-ratio: 16 / 9; background: #12161b;
+    border-radius: 14px; overflow: hidden;
+    border: 1px solid rgba(120,104,80,.22);
+    box-shadow: 0 30px 70px rgba(78,62,38,.28), 0 3px 10px rgba(78,62,38,.14);
   }
   .player video { width: 100%; height: 100%; display: block; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; justify-content: center; }
+  .chip {
+    font-size: 12px; padding: 5px 12px; border-radius: 999px;
+    background: #fffdf7; border: 1px solid rgba(120,104,80,.24); color: #4d5a67;
+  }
+  .chip b { color: #a8620f; font-weight: 700; }
   .meta {
     display: flex; flex-wrap: wrap; gap: 10px 22px; justify-content: space-between;
-    margin-top: 18px; font-size: 13px; color: #5f7690;
+    margin-top: 16px; font-size: 13px; color: #6a7480;
   }
-  .meta a { color: #b9cde2; text-decoration: none; border-bottom: 1px solid rgba(185, 205, 226, .3); }
-  .meta a:hover { color: #e9f1f9; border-color: #e9f1f9; }
-  footer { margin-top: 34px; font-size: 12px; color: #31445a; letter-spacing: .08em; text-align: center; line-height: 1.9; }
+  .meta a { color: #0d6e86; text-decoration: none; border-bottom: 1px solid rgba(13,110,134,.32); }
+  .meta a:hover { color: #a8620f; border-color: #a8620f; }
+  footer { margin-top: 32px; font-size: 12px; color: #8a8478; letter-spacing: .06em; text-align: center; line-height: 1.9; }
 </style>
 </head>
 <body>
 <main class="film">
   <p class="kicker">agent-kernel · showcase</p>
   <h1>不写代码，写写代码这件事</h1>
-  <p class="sub">空间 · 时间 · 规则 —— 三件事的内核，撑起一切可替换的能力</p>
+  <p class="sub">只做三件事的内核 —— 空间 / 时间 / 规则</p>
   <div class="player">
-    <video controls playsinline preload="metadata" poster="media/agent-kernel-poster.jpg">
-      <source src="media/agent-kernel.mp4" type="video/mp4">
-      你的浏览器不支持视频播放，可<a href="media/agent-kernel.mp4">下载观看</a>。
+    <video controls playsinline preload="metadata" poster="docs/media/agent-kernel-poster.jpg">
+      <source src="docs/media/agent-kernel.mp4" type="video/mp4">
+      你的浏览器不支持视频播放，可<a href="docs/media/agent-kernel.mp4">下载观看</a>。
     </video>
   </div>
-  <div class="meta">
-    <span>2 分 15 秒 · 20 镜 · 1920×1080 · 30fps</span>
-    <span><a href="https://github.com/zh2673-git/agent-kernel">github.com/zh2673-git/agent-kernel</a></span>
+  <div class="chips">
+    <span class="chip"><b>亮调纸感</b> · 米白基底 / 墨蓝结构 / 青×琥珀</span>
+    <span class="chip"><b>真人音色克隆</b> · Qwen3-TTS 零样本</span>
+    <span class="chip"><b>卡通主讲</b> · 悬浮角标全程在场</span>
+    <span class="chip"><b>真实素材</b> · 4 镜实拍/实码/实日志</span>
   </div>
-  <footer>
-    全片由 make-video 代码逐镜绘制（HTML Canvas + MV 动效原语），无任何第三方图像/视频生成<br>
-    旁白为 TTS 合成，配乐为程序化编写的交响床垫
-  </footer>
+  <div class="meta">
+    <span>20 镜 · 2 分 09 秒 · 1920×1080 / 30fps</span>
+    <span><a href="docs/media/agent-kernel.mp4">下载 MP4</a> · <a href="../">返回仓库首页</a></span>
+  </div>
+  <footer>地基建好，进化才敢发生。<br>agent-kernel · 用 make-video 生产</footer>
 </main>
 </body>
 </html>
