@@ -83,7 +83,7 @@ pub use plugin::{Plugin, PluginInstance};
 | **LifecycleManager + DrainCoordinator**（`domain/lifecycle`） | 插件状态机唯一仲裁者；in-flight 计数 + 超时熔断（热替换不撕裂时间流） |
 | **Scheduler + EventBus**（`runtime/scheduler`） | 事件循环 Loop + 4 条有界优先级泳道 + 背压；状态用 `watch`、事件用 `broadcast` |
 | **ExecutionDomain**（`runtime/domain`） | 三种隔离强度：`InProcess`（亚微秒）/ `Wasm`（线性内存强隔离）/ `Process`（独立进程自愈） |
-| **CapabilityGate**（`domain/capability`） | 能力门控，**deny-by-default**（插件能碰哪些外部空间） |
+| **CapabilityGate**（`core/capability`，`Kernel::call_capability` 执行） | 能力门控，**deny-by-default**：调用方清单 `dependencies` 即授权集，未声明 ⇒ `K405`；`HostApi::call_capability*` 不带调用方身份、不过闸 |
 | **HotSwap**（`application/hotswap`） | 事务性热替换：validate→load→[snapshot→restore]→start→CAS→drain→destroy→失败回滚 |
 | **Observability**（`runtime/observability`） | 内核承担跨插件 `trace_id`（ULID）串联；插件自打日志无法完成链路追踪 |
 | **Snapshot/Migration**（`domain/snapshot`） | 热替换时旧状态"可丢弃或可快照迁移"的协议（`trait Migratable`） |

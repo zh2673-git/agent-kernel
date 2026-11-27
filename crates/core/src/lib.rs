@@ -16,7 +16,7 @@ mod lifecycle;
 mod manifest;
 mod version;
 
-pub use capability::{Capability, CapabilitySet};
+pub use capability::{Capability, CapabilityGate, CapabilitySet};
 pub use envelope::{Envelope, Priority};
 pub use error::{KernelError, KernelResult};
 pub use event::{Event, LifecycleEvent, LifecyclePhase};

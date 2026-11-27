@@ -527,6 +527,94 @@ async fn k2_call_capability_resolves_and_follows_hot_swap() {
     assert_eq!(r2["name"], json!("v2"), "热替换后 call_capability 应流向新实例: {r2:?}");
 }
 
+// ---- E（ADR-011）：能力门控 deny-by-default，调用方清单未声明 ⇒ K405 ----
+
+/// 带调用方身份寻址的测试插件：把 caller（= 自己的插件名）与 payload.cap 交给
+/// `Kernel::call_capability`，结果码原样回传。`deps` 即清单声明的依赖（授权集）。
+struct GatedCallPlugin {
+    manifest: Manifest,
+}
+
+impl GatedCallPlugin {
+    fn new(name: &'static str, deps: Vec<Capability>) -> PluginInstance {
+        let manifest = Manifest {
+            name: PluginId::new(name),
+            kind: PluginKind::Capability,
+            version: Version::new(0, 1, 0),
+            api_version: ApiVersion::new(1, 0),
+            capabilities: vec![],
+            dependencies: deps
+                .into_iter()
+                .map(|capability| agent_kernel_sdk::DependencySpec { capability, hard: true })
+                .collect(),
+            domain: Domain::InProcess,
+            semantics: Semantics::Serial,
+            priority: 1,
+            max_inflight: Some(4),
+            fuel_limit: None,
+            host_timeout_ms: None,
+            epoch_interval_ms: None,
+            subscriptions: vec![],
+        };
+        Arc::new(Self { manifest })
+    }
+}
+
+#[async_trait]
+impl Plugin for GatedCallPlugin {
+    fn id(&self) -> PluginId {
+        self.manifest.name.clone()
+    }
+    fn manifest(&self) -> &Manifest {
+        &self.manifest
+    }
+    async fn init(&self, _ctx: &PluginContext) -> KernelResult<()> {
+        Ok(())
+    }
+    async fn on_event(&self, _env: Env) -> KernelResult<serde_json::Value> {
+        Ok(json!({ "gated": self.manifest.name.to_string() }))
+    }
+    fn destroy(&self) -> KernelResult<()> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn e_gate_denies_undeclared_and_allows_declared_capability() {
+    let k = fresh_kernel().await;
+    k.register(NamedPlugin::new("svc-v1", "svc", "v1")).await;
+    let undeclared = PluginId::new("cc-undeclared");
+    let declared = PluginId::new("cc-declared");
+    let unknown = PluginId::new("cc-absent");
+    k.register(GatedCallPlugin::new("cc-undeclared", vec![])).await;
+    k.register(GatedCallPlugin::new("cc-declared", vec![Capability::new("svc")])).await;
+
+    // ① deny-by-default：清单未声明 svc ⇒ K405
+    let e = k
+        .call_capability(&undeclared, "svc", json!({}), Duration::from_millis(500))
+        .await
+        .unwrap_err();
+    assert_eq!(e.code(), "K405", "未声明依赖的调用方必须被门控拒绝: {e:?}");
+
+    // ② 声明即授权：命中提供者
+    let r = k
+        .call_capability(&declared, "svc", json!({}), Duration::from_millis(500))
+        .await
+        .unwrap();
+    assert_eq!(r["name"], json!("v1"), "已声明依赖的调用方应命中 svc 提供者: {r:?}");
+
+    // ③ 授权集 = 清单 dependencies；未注册的调用方不是「授权为空」而是 K401
+    assert_eq!(k.granted(&declared).unwrap(), vec![Capability::new("svc")]);
+    assert!(k.granted(&undeclared).unwrap().is_empty());
+    assert_eq!(
+        k.call_capability(&unknown, "svc", json!({}), Duration::from_millis(500))
+            .await
+            .unwrap_err()
+            .code(),
+        "K401"
+    );
+}
+
 #[tokio::test]
 async fn k2_unknown_capability_is_k404() {
     let k = fresh_kernel().await;

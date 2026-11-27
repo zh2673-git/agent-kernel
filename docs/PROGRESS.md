@@ -1,7 +1,7 @@
 # agent-kernel 进度文档
 
 > 一份持续维护的进度快照。设计纲要见 `program.md`（同目录），设计理由见 `docs/00~07`，使用方式见 `../README.md`。
-> 最后更新：**2026-09-08**（v0.1.2：修复 Process 域 Concurrent 语义失效——`ProcessPlugin` 整段 RPC 持 client 锁把并发在途无声串行化；改为锁内克隆、锁外 await）。
+> 最后更新：**2026-11-27**（v0.1.9：`CapabilityGate` 最小实现——`Kernel::call_capability(caller, …)` 按调用方清单的 `dependencies` 做授权，未声明 ⇒ K405）。
 > 仓库：**https://github.com/zh2673-git/agent-kernel**
 
 ---
@@ -54,6 +54,7 @@
 | 阶段六 | **Process 域传输升级为 gRPC**（tonic + protobuf，Rust/Python/TS 三端统一） | ✅ 完成 |
 | 阶段六·1（v0.1.1） | **修复 Process 域 destroy kill 竞态**：`ProcessPlugin::destroy` 改为同步 `start_kill`（kill 不再依赖宿主运行时存活），Destroy RPC 降级为 kill 后 best-effort。由下游项目 react-agent e2e 实测发现（泄漏 guest 残留 → 扣住 cargo 管道） | ✅ 完成（e2e 后零残留进程） |
 | 阶段六·2（v0.1.2） | **修复 Process 域 Concurrent 语义失效**：`ProcessPlugin::call_on_event` 整段 unary RPC 持 client 锁，使声明 `Concurrent` 的插件被无声串行化（域层按 `semantics` 判定无误，问题只在 host 代理）。改为锁内克隆 client（tonic 克隆共享同一 Channel）、RPC 锁外 await；串行化仍由 `ProcessDomain` 插件级锁保证。新增 `tests/concurrent_semantics.rs`（4×300ms 并发实测 0.34s，修复前 ≥1.2s）。由 react-agent K502 雪崩归因发现（卡死在途 RPC 长期占锁 → 同插件请求连锁排队） | ✅ 完成（workspace 测试全绿） |
+| 阶段七（v0.1.9） | **`CapabilityGate` 落地**：README/设计稿承诺的「能力门控」此前在代码中并不存在（文档标 ✅ 而无实现）。新增 `core::CapabilityGate`（授权集 = 调用方清单 `dependencies[].capability`，`check` 未命中 ⇒ `KernelError::CapabilityDenied` = **K405**）与 `Kernel::call_capability(caller, capability, payload, deadline)` / `Kernel::granted(&PluginId)`；未注册调用方 K401。**限制**：只做「能力」一维，`HostApi::call_capability*` 不带调用方身份、不过闸 | ✅ 完成（core 单测 2 + kernel invariants 12，workspace 21 过 / 0 败 / 3 ignored） |
 
 ### 阶段六交付细节（本次收尾）
 - **Rust 侧**：`build.rs` 用 `tonic-prost-build` 编译 `schema/kernel.proto` 生成 stub；`ProcessPlugin` 改为 gRPC 客户端，`guest` 改为 gRPC server（启动打印 `PORT=<n>` 由内核连接 127.0.0.1）。
@@ -63,7 +64,7 @@
 
 ---
 
-## 4. 当前验证状态（2026-09-03 实测）
+## 4. 当前验证状态（2026-09-03 实测；末行为 2026-11-27 v0.1.9 追记）
 
 | 验证项 | 命令 | 结果 |
 |---|---|---|
@@ -74,6 +75,7 @@
 | Python gRPC e2e | `python_guest_roundtrip` | ✅ 内核 spawn python 插件往返 dispatch |
 | TS gRPC e2e | `node_guest_roundtrip` | ✅ 内核 spawn `node --experimental-strip-types` 插件往返 dispatch |
 | WASM e2e | `wasm_domain_roundtrip` | ✅ 已跑通（2026-09-03 补验：`wasm32-wasip2` target 已装，`xtask build-wasm` 构建 guest 组件后 dispatch 往返 + 二次串行调用通过） |
+| v0.1.9 全仓测试 | `cargo test --manifest-path crates/Cargo.toml -q`（隔离 `CARGO_TARGET_DIR`） | ✅ 29 个测试套件 21 过 / 0 败 / 3 ignored（wasm，本机未装 target）/ 0 warning；含 `CapabilityGate` 单测与 `invariants::e_gate_denies_undeclared_and_allows_declared_capability`。红已确认：stash 掉实现 → `E0432` |
 
 ---
 
@@ -139,7 +141,7 @@ cargo test -p agent-kernel-process     # 触发 python/node/rust gRPC e2e
 
 ## 8. 未完成 / 后续路线
 
-1. **发布为外部依赖**：✅ 已发布 GitHub（2026-09-03），首个版本 **v0.1.0**（[Release](https://github.com/zh2673-git/agent-kernel/releases/tag/v0.1.0)），下游可以 git 依赖引用（`agent-kernel-sdk = { git = "...", tag = "v0.1.0" }`）；✅ 「仅依赖、不改内核源码」路径已实证：react-agent（v0.1.22 起整树消费）与 rsi-agent（runtime 内嵌 + v0.1.8 tag 依赖）均为真实外部下游，含 Python/TS guest 插件；⏸ 剩余：crates.io 发布（可选）。
+1. **发布为外部依赖**：✅ 已发布 GitHub（2026-09-03），首个版本 **v0.1.0**（[Release](https://github.com/zh2673-git/agent-kernel/releases/tag/v0.1.0)），下游可以 git 依赖引用（`agent-kernel-sdk = { git = "...", tag = "v0.1.0" }`）；✅ 「仅依赖、不改内核源码」路径已实证：react-agent（v0.1.22 起整树消费）与 rsi-agent（runtime 内嵌 + v0.1.8 tag 依赖）均为真实外部下游；**v0.1.9**（2026-11-27）= `CapabilityGate`，由 rsi-agent 对标审计发现「文档承诺、代码缺失」后补上，react-agent v0.1.29 起依赖该 tag，含 Python/TS guest 插件；⏸ 剩余：crates.io 发布（可选）。
 2. **充实示例插件**：LLM 适配器、agent 主循环、记忆、工具注册（当前仅有 `skeleton-llm` / `skeleton-tools` 骨架）。
 3. **（可选）流式 RPC**：若需 LLM token 流等真流式，于 `kernel.proto` 新增 `OnEventStream` 双向流 RPC（已留注释位）。
 

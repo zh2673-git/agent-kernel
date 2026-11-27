@@ -4,7 +4,7 @@ use crate::domain::scheduler::SchedulerRef;
 use crate::domain::{dependency, hotswap::HotSwapCoordinator, lifecycle::LifecycleManager, registry::Registry, scheduler::Scheduler};
 use crate::infrastructure::bus::EventBus;
 use crate::interfaces::{dispatch, KernelHost};
-use agent_kernel_core::{Capability, KernelError, PluginId};
+use agent_kernel_core::{Capability, CapabilityGate, KernelError, PluginId, TraceId};
 use agent_kernel_sdk::{Envelope, GlobalConfig, PluginInstance, Priority};
 use arc_swap::ArcSwap;
 use serde_json::Value;
@@ -86,6 +86,52 @@ impl Kernel {
         if let Err(e) = self.inner.register_instance(p).await {
             tracing::error!("register failed: {e}");
         }
+    }
+
+    /// 能力门控（ADR-011，K405）：按 capability 寻址并**带调用方身份**。
+    /// 调用方清单的 `dependencies` 即授权集，未声明 ⇒ 拒绝（deny-by-default）；
+    /// 通过后与 `HostApi::call_capability` 同链（K2 动态解析 / B5 / B2 / B4 / deadline）。
+    /// `HostApi::call_capability*` 不携带调用方身份，无法过闸——需要门控的调用走这里。
+    pub async fn call_capability(
+        &self,
+        caller: &PluginId,
+        capability: &str,
+        payload: Value,
+        deadline: std::time::Duration,
+    ) -> Result<Value, agent_kernel_core::KernelError> {
+        let slot = self
+            .inner
+            .registry
+            .slot(caller)
+            .ok_or_else(|| KernelError::UnknownPlugin(caller.clone()))?;
+        let gate = CapabilityGate::from_granted(
+            slot.manifest.dependencies.iter().map(|d| d.capability.clone()),
+        );
+        gate.check(caller, &Capability::new(capability))?;
+        let target = self.inner.cap_provider(capability)?;
+        let env = Envelope {
+            target,
+            trace_id: TraceId::new(),
+            priority: Priority::Normal,
+            deadline: Some(deadline),
+            payload,
+        };
+        dispatch::dispatch(self.inner.clone(), env).await
+    }
+
+    /// 某插件当前被授予的 capability（= 其清单 `dependencies`；热替换后随新清单变化）。
+    pub fn granted(&self, id: &PluginId) -> Result<Vec<Capability>, agent_kernel_core::KernelError> {
+        let slot = self
+            .inner
+            .registry
+            .slot(id)
+            .ok_or_else(|| KernelError::UnknownPlugin(id.clone()))?;
+        Ok(slot
+            .manifest
+            .dependencies
+            .iter()
+            .map(|d| d.capability.clone())
+            .collect())
     }
 
     /// 直接分发（供测试 / 同步调用）。

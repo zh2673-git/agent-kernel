@@ -39,6 +39,9 @@ pub enum KernelError {
     /// K404：capability 无提供者（call_capability 寻址失败，K2 寻址契约）。
     #[error("[K404] no provider registered for capability '{0}'")]
     UnknownCapability(String),
+    /// K405：能力门控拒绝（调用方清单未声明该 capability，ADR-011 deny-by-default）。
+    #[error("[K405] plugin {0} is not granted capability '{1}'")]
+    CapabilityDenied(PluginId, String),
 
     // ---- 时间/执行 ----
     /// K501：catch_unwind 捕获到 panic（B2）。
@@ -90,6 +93,7 @@ impl KernelError {
             KernelError::NotRunning(..) => "K402",
             KernelError::DrainingReject(_) => "K403",
             KernelError::UnknownCapability(_) => "K404",
+            KernelError::CapabilityDenied(..) => "K405",
             KernelError::PluginPanic(..) => "K501",
             KernelError::DeadlineExceeded(_) => "K502",
             KernelError::Cancelled(_) => "K503",
